@@ -31,10 +31,19 @@ const HEADERS = {
 // ─── HELPERS ────────────────────────────────────────────────────
 const fmt    = ts  => dayjs(ts).tz(ZONA).format('DD/MM/YY HH:mm:ss');
 const ahora  = ()  => dayjs().tz(ZONA).format('DD/MM/YYYY HH:mm:ss');
+
+// Ordena periodos por fin DESC y toma el más reciente
+// FIX v3: garantiza que siempre leemos el ultimo periodo aunque
+// la API los mande desordenados (un banco puede tener hasta 5)
+const sortPeriodos = (p) => {
+  if (!Array.isArray(p) || p.length === 0) return [];
+  return [...p].sort((a, b) => b.fin - a.fin);
+};
+
 const isConn = (p) => {
   if (!Array.isArray(p) || p.length === 0) return false;
-  const AHORA = Date.now();
-  return (AHORA - p.slice(-1)[0].fin) <= MARGEN;
+  const sorted = sortPeriodos(p);
+  return (Date.now() - sorted[0].fin) <= MARGEN;
 };
 
 // ─── MAIN ────────────────────────────────────────────────────────
@@ -52,7 +61,7 @@ const isConn = (p) => {
 
   console.log('');
   console.log(B+'  ╔══════════════════════════════════════════════════════╗'+X);
-  console.log(B+'  ║   MONSPEI Banxico — Scraper  [Poka-Yoke v2]          ║'+X);
+  console.log(B+'  ║   MONSPEI Banxico — Scraper  [Poka-Yoke v3]          ║'+X);
   console.log(B+'  ╚══════════════════════════════════════════════════════╝'+X);
   console.log('  Fecha    : ' + FECHA);
   console.log('  Capturado: ' + timestamp);
@@ -72,16 +81,18 @@ const isConn = (p) => {
 
   // ── 2. Clasificar: true (verde) o false (rojo) ───────────────
   const bancos = todos.map(item => {
-    const p = item.periodos || [];
-    const u = p.slice(-1)[0] || {};
+    const p      = item.periodos || [];
+    const sorted = sortPeriodos(p);   // FIX v3: ordenados por fin DESC
+    const u      = sorted[0] || {};   // FIX v3: siempre el más reciente
     return {
-      nombre:    item.banco,
-      estatus:   isConn(p),
-      inicio:    u.inicio ? fmt(u.inicio) : 'N/A',
-      fin:       u.fin    ? fmt(u.fin)    : 'N/A',
-      diferencia: u.fin
+      nombre:      item.banco,
+      estatus:     isConn(p),
+      inicio:      u.inicio ? fmt(u.inicio) : 'N/A',
+      fin:         u.fin    ? fmt(u.fin)    : 'N/A',
+      diferencia:  u.fin
         ? (Math.round((Date.now() - u.fin) / 60000) + ' min')
         : 'N/A',
+      numPeriodos: p.length,  // FIX v3: cuántos periodos tiene
     };
   });
 
@@ -98,7 +109,9 @@ const isConn = (p) => {
     const num    = String(i+1).padStart(2,'0');
     const estado = b.estatus ? V+'[true ] '+X : R+'[false] '+X;
     const nom    = b.nombre.padEnd(22);
-    console.log('  '+num+'. '+estado+' '+nom+' '+b.inicio+'  '+b.fin);
+    // Mostrar (xp) si tiene más de 1 periodo
+    const extra  = b.numPeriodos > 1 ? ' ('+b.numPeriodos+'p)' : '';
+    console.log('  '+num+'. '+estado+' '+nom+' '+b.inicio+'  '+b.fin+extra);
   });
 
   console.log('  '+'-'.repeat(76));
@@ -144,8 +157,6 @@ const isConn = (p) => {
   }
 
   // ── 4b. all.csv ── POKA-YOKE ─────────────────────────────────
-  // writeFileSync = sobreescribe SIEMPRE
-  // Resultado: exactamente 94 filas, estado actual, sin duplicados
   const rutaAll  = path.join(DIR, 'all.csv');
   const filasAll = bancos.map(b =>
     '"'+b.nombre.replace(/"/g,'""')+'",'
@@ -156,8 +167,6 @@ const isConn = (p) => {
   fs.writeFileSync(rutaAll, cab + filasAll.join('\n') + '\n', 'utf8');
 
   // ── 4c. desconectados.csv ── POKA-YOKE ───────────────────────
-  // writeFileSync = sobreescribe SIEMPRE
-  // Resultado: solo los bancos rojos de ESTE momento, limpio
   const rutaDisc = path.join(DIR, 'desconectados.csv');
   if (disc.length > 0) {
     const filasDisc = disc.map(b =>
@@ -170,8 +179,6 @@ const isConn = (p) => {
   }
 
   // ── 4d. historial.csv ── ACUMULA ─────────────────────────────
-  // appendFileSync = acumula cada corrida
-  // Resultado: log histórico completo para analisis posterior
   const rutaHist = path.join(DIR, 'historial.csv');
   const esNuevo  = !fs.existsSync(rutaHist);
   const filasHist = bancos.map(b =>
