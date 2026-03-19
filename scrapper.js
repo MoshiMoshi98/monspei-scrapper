@@ -39,7 +39,7 @@ const EMAIL_CONFIG = {
   },
   de:   'leocruz.contacto@gmail.com',
   para: 'angel.ortiz@banxico.org.mx, ralfaro@banxico.org.mx, tenoch.flores@banxico.org.mx, angel.garcia@banxico.org.mx, andres.velazquez@banxico.org.mx, nahieli.osorio@banxico.org.mx',
-  // para enviar a varios: 'memo@banxico.org.mx, angel@banxico.org.mx'
+  // para enviar a varios: 'Nombresdelimplicado@banxico.org.mx, angel@banxico.org.mx'
 };
 
 // ─── ARCHIVO DE ESTADO ANTERIOR ─────────────────────────────────
