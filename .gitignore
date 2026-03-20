@@ -1,5 +1,7 @@
 scrapper.js
-package.json
 package-lock.json
-node_modules/salidas/
 node_modules/
+salidas/estado_anterior.json
+salidas/historial.csv
+salidas/cambios.csv
+salidas/log.txt

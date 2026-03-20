@@ -26,20 +26,20 @@ const MARGEN   = 5 * 60 * 1000;
 // Pregunta exacta para TI:
 //   "¿Cuál es el servidor SMTP para envío de correo saliente,
 //    el puerto y si usa TLS o SSL?"
+// ─── CONFIG EMAIL ── lee variables de entorno (GitHub Secrets) ──
 const EMAIL_CONFIG = {
-  habilitado: true,
+  habilitado: !!(process.env.GMAIL_USER && process.env.GMAIL_PASS),
   smtp: {
     host:   'smtp.gmail.com',
     port:   587,
     secure: false,
     auth: {
-      user: 'leocruz.contacto@gmail.com',
-      pass: 'jjdnkoxivolykbtg',
+      user: process.env.GMAIL_USER || '',
+      pass: process.env.GMAIL_PASS || '',
     },
   },
-  de:   'leocruz.contacto@gmail.com',
-  para: 'angel.ortiz@banxico.org.mx, ralfaro@banxico.org.mx, tenoch.flores@banxico.org.mx, angel.garcia@banxico.org.mx, andres.velazquez@banxico.org.mx, nahieli.osorio@banxico.org.mx',
-  // para enviar a varios: 'Nombresdelimplicado@banxico.org.mx, angel@banxico.org.mx'
+  de:   process.env.GMAIL_USER || '',
+  para: process.env.GMAIL_PARA || '',
 };
 
 // ─── ARCHIVO DE ESTADO ANTERIOR ─────────────────────────────────

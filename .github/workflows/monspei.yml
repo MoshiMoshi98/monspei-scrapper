@@ -1,0 +1,58 @@
+name: MONSPEI — Monitor SPEI
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  monitorear:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Crear carpeta salidas
+        run: mkdir -p salidas
+
+      - name: Restaurar estado anterior
+        uses: actions/cache@v4
+        with:
+          path: salidas/estado_anterior.json
+          key: estado-${{ github.run_id }}
+          restore-keys: estado-
+
+      - name: Correr scrapper
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
+          GMAIL_PARA: ${{ secrets.GMAIL_PARA }}
+        run: node scrapper.js
+
+      - name: Guardar CSVs en repo para dashboard
+        run: |
+          git config user.name  "Leo Gael Cruz Castañeda"
+          git config user.email "leocruz.contacto@gmail.com"
+          git add salidas/all.csv salidas/desconectados.csv
+          git diff --staged --quiet || git commit -m "auto: update SPEI $(date +'%d/%m/%Y %H:%M')"
+          git push origin main
+
+      - name: Guardar estado para siguiente corrida
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: salidas/estado_anterior.json
+          key: estado-${{ github.run_id }}
