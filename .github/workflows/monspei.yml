@@ -28,13 +28,6 @@ jobs:
       - name: Crear carpeta salidas
         run: mkdir -p salidas
 
-      - name: Restaurar estado anterior
-        uses: actions/cache@v4
-        with:
-          path: salidas/estado_anterior.json
-          key: estado-${{ github.run_id }}
-          restore-keys: estado-
-
       - name: Correr scrapper
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
@@ -42,17 +35,12 @@ jobs:
           GMAIL_PARA: ${{ secrets.GMAIL_PARA }}
         run: node scrapper.js
 
-      - name: Guardar CSVs en repo para dashboard
+      - name: Guardar archivos en repo
         run: |
           git config user.name  "Leo Gael Cruz Castañeda"
           git config user.email "leocruz.contacto@gmail.com"
-          git add salidas/all.csv salidas/desconectados.csv
+          git add salidas/all.csv \
+                  salidas/desconectados.csv \
+                  salidas/estado_anterior.json
           git diff --staged --quiet || git commit -m "auto: update SPEI $(date +'%d/%m/%Y %H:%M')"
           git push origin main
-
-      - name: Guardar estado para siguiente corrida
-        uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: salidas/estado_anterior.json
-          key: estado-${{ github.run_id }}
