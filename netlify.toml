@@ -1,0 +1,5 @@
+[build]
+  publish = "."
+  command = "echo 'Static site'"
+  ignore  = "! git diff --name-only $CACHED_COMMIT_REF $COMMIT_REF | grep -qv '^salidas/'"
+ 
