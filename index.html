@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monitor SPEI — Banco de México</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:     #1a3a5c;
+      --navy-mid: #2E75B6;
+      --bg:       #F4F7FB;
+      --surface:  #ffffff;
+      --border:   #D0DAE8;
+      --border2:  #E8EFF7;
+      --text:     #1a2e45;
+      --muted:    #6B8AAA;
+      --green:    #1a7a4a;
+      --green-bg: #EBF7F1;
+      --green-bd: #B6DEC9;
+      --red:      #C0392B;
+      --red-bg:   #FDF0EF;
+      --red-bd:   #F5C6C0;
+      --blue:     #1a4a80;
+      --blue-bg:  #EBF2FB;
+      --blue-bd:  #B6CCE8;
+      --amber:    #8a5a00;
+      --amber-bg: #FEF8EC;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; min-height: 100vh; }
+
+    /* HEADER */
+    header {
+      background: var(--navy);
+      padding: 0 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 56px; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 8px rgba(26,58,92,0.15);
+    }
+    .hl { display: flex; align-items: center; gap: 14px; }
+    .logo { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600; color: #fff; letter-spacing: 2px; }
+    .hdiv { width: 1px; height: 22px; background: rgba(255,255,255,0.2); }
+    .htitle { font-size: 13px; color: rgba(255,255,255,0.65); }
+    .hr { display: flex; align-items: center; gap: 10px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #2ecc71; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .stxt { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: rgba(255,255,255,0.55); }
+    .btn-r {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.8); padding: 5px 14px; border-radius: 4px;
+      font-size: 12px; cursor: pointer; font-family: 'IBM Plex Mono', monospace;
+      transition: all 0.2s;
+    }
+    .btn-r:hover { background: rgba(255,255,255,0.2); }
+
+    /* MAIN */
+    main { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+
+    /* MÉTRICAS */
+    .metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 16px; }
+    .mc {
+      background: var(--surface); border: 1px solid var(--border);
+      border-top: 3px solid transparent; border-radius: 4px; padding: 20px 22px;
+    }
+    .mc.g { border-top-color: #27ae60; }
+    .mc.r { border-top-color: #e74c3c; }
+    .mc.b { border-top-color: var(--navy-mid); }
+    .mc.a { border-top-color: #e67e22; }
+    .mv { font-family: 'IBM Plex Mono', monospace; font-size: 34px; font-weight: 600; line-height: 1; margin-bottom: 7px; }
+    .mc.g .mv { color: var(--green); }
+    .mc.r .mv { color: var(--red); }
+    .mc.b .mv { color: var(--blue); }
+    .mc.a .mv { color: var(--amber); }
+    .ml { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+    /* TIMESTAMP */
+    .tsbar {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+      padding: 9px 16px; margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .tsbar span { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+    .tsbar .hl2 { color: var(--navy); font-weight: 600; }
+
+    /* ALERTAS */
+    .alerts { margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
+    .al {
+      padding: 11px 16px; border-radius: 4px; border-left: 3px solid;
+      display: flex; align-items: center; justify-content: space-between; font-size: 13px;
+    }
+    .al.r { background: var(--red-bg);   border-color: #e74c3c; }
+    .al.g { background: var(--green-bg); border-color: #27ae60; }
+    .aname { font-weight: 600; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+    .al.r .aname { color: var(--red); }
+    .al.g .aname { color: var(--green); }
+    .abadge {
+      font-size: 10px; letter-spacing: .8px; padding: 2px 8px; border-radius: 3px;
+      font-family: 'IBM Plex Mono', monospace; font-weight: 600;
+    }
+    .al.r .abadge { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-bd); }
+    .al.g .abadge { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-bd); }
+
+    /* TABLA */
+    .tsec { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+    .thead2 {
+      padding: 12px 18px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg);
+    }
+    .ttitle { font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+    .tsearch {
+      background: var(--surface); border: 1px solid var(--border); color: var(--text);
+      padding: 6px 12px; border-radius: 3px; font-size: 12px;
+      font-family: 'IBM Plex Sans', sans-serif; width: 200px; outline: none;
+    }
+    .tsearch:focus { border-color: var(--navy-mid); }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { background: var(--bg); border-bottom: 1px solid var(--border); }
+    th { padding: 9px 16px; text-align: left; font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+    tbody tr { border-bottom: 1px solid var(--border2); transition: background .12s; }
+    tbody tr:hover { background: var(--blue-bg); }
+    tbody tr:last-child { border-bottom: none; }
+    td { padding: 9px 16px; font-size: 13px; }
+    td.num { font-family: 'IBM Plex Mono', monospace; color: var(--muted); font-size: 11px; }
+    td.ttime { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px; border-radius: 3px; font-size: 10px; font-weight: 600;
+      font-family: 'IBM Plex Mono', monospace; letter-spacing: .5px;
+    }
+    .bon { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-bd); }
+    .boff { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-bd); }
+    .bd { width: 5px; height: 5px; border-radius: 50%; }
+    .bon .bd { background: #27ae60; }
+    .boff .bd { background: #e74c3c; }
+
+    /* FOOTER */
+    footer {
+      text-align: center; padding: 20px; font-size: 11px; color: var(--muted);
+      font-family: 'IBM Plex Mono', monospace; border-top: 1px solid var(--border); margin-top: 28px;
+    }
+    footer strong { color: var(--navy); }
+
+    .loading { text-align: center; padding: 48px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+    .err { text-align: center; padding: 40px; color: var(--red); font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+
+    @media (max-width: 768px) {
+      .metrics { grid-template-columns: repeat(2,1fr); }
+      header { padding: 0 16px; }
+      main { padding: 16px; }
+      td.ttime { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="hl">
+    <span class="logo">MONSPEI</span>
+    <div class="hdiv"></div>
+    <span class="htitle">Monitor SPEI — Banco de México · CIR</span>
+  </div>
+  <div class="hr">
+    <div class="dot"></div>
+    <span class="stxt" id="stxt">cargando...</span>
+    <button class="btn-r" onclick="cargarDatos()">↺ Actualizar</button>
+  </div>
+</header>
+
+<main>
+  <div class="metrics">
+    <div class="mc g"><div class="mv" id="mConn">—</div><div class="ml">Conectadas</div></div>
+    <div class="mc r"><div class="mv" id="mDisc">—</div><div class="ml">Desconectadas</div></div>
+    <div class="mc b"><div class="mv" id="mTotal">—</div><div class="ml">Total SPEI</div></div>
+    <div class="mc a"><div class="mv" id="mPct">—</div><div class="ml">Disponibilidad</div></div>
+  </div>
+
+  <div class="tsbar">
+    <span>Última actualización: <span class="hl2" id="lastUpd">—</span></span>
+    <span id="nextUpd"></span>
+  </div>
+
+  <div class="alerts" id="alertsCont"></div>
+
+  <div class="tsec">
+    <div class="thead2">
+      <span class="ttitle">Entidades financieras SPEI</span>
+      <input type="text" class="tsearch" placeholder="Buscar entidad..." oninput="filtrar(this.value)">
+    </div>
+    <div id="tableCont">
+      <div class="loading">Consultando MONSPEI...</div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <strong>MONSPEI v5</strong> &nbsp;·&nbsp; Centro de Inteligencia y Respuesta &nbsp;·&nbsp; Dirección de Ciberseguridad &nbsp;·&nbsp; Banxico<br>
+  Monitoreo automático · Actualización cada 30 minutos
+</footer>
+
+<script>
+  // ── CAMBIA ESTA URL por la de tu repo GitHub ──────────────────
+  const CSV_URL = 'https://raw.githubusercontent.com/MoshiMoshi98/monspei-scrapper/main/salidas/all.csv';
+
+  let datos = [];
+  let ultimaAct = null;
+
+  function parsearCSV(txt) {
+    return txt.trim().split('\n').slice(1).map(l => {
+      const c = l.match(/(".*?"|[^,]+)(?=,|$)/g);
+      if (!c || c.length < 4) return null;
+      return {
+        nombre:    c[0].replace(/"/g,'').trim(),
+        estatus:   c[1].trim() === 'true',
+        diferencia:c[2].trim(),
+        tiempo:    c[3].replace(/"/g,'').trim()
+      };
+    }).filter(Boolean);
+  }
+
+  function renderMetricas(d) {
+    const conn = d.filter(x=>x.estatus).length;
+    const disc = d.filter(x=>!x.estatus).length;
+    const tot  = d.length;
+    const pct  = tot > 0 ? ((conn/tot)*100).toFixed(1) : 0;
+    document.getElementById('mConn').textContent  = conn;
+    document.getElementById('mDisc').textContent  = disc;
+    document.getElementById('mTotal').textContent = tot;
+    document.getElementById('mPct').textContent   = pct + '%';
+    const mcA = document.querySelector('.mc.a');
+    const mvA = document.getElementById('mPct');
+    if (pct >= 99)      { mcA.style.borderTopColor='#27ae60'; mvA.style.color='#1a7a4a'; }
+    else if (pct >= 95) { mcA.style.borderTopColor='#e67e22'; mvA.style.color='#8a5a00'; }
+    else                { mcA.style.borderTopColor='#e74c3c'; mvA.style.color='#C0392B'; }
+  }
+
+  function renderAlertas(d) {
+    const disc = d.filter(x=>!x.estatus);
+    const c = document.getElementById('alertsCont');
+    c.innerHTML = disc.map(x=>`
+      <div class="al r">
+        <span class="aname">● ${x.nombre}</span>
+        <span class="abadge">DESCONECTADA</span>
+      </div>`).join('');
+  }
+
+  function renderTabla(d) {
+    const c = document.getElementById('tableCont');
+    if (!d.length) { c.innerHTML='<div class="err">Sin datos</div>'; return; }
+    c.innerHTML = `<table>
+      <thead><tr><th>#</th><th>Entidad financiera</th><th>Estado</th><th>Última actividad</th><th>Captura</th></tr></thead>
+      <tbody>${d.map((x,i)=>`
+        <tr data-n="${x.nombre.toLowerCase()}">
+          <td class="num">${String(i+1).padStart(2,'0')}</td>
+          <td style="font-weight:500">${x.nombre}</td>
+          <td><span class="badge ${x.estatus?'bon':'boff'}"><span class="bd"></span>${x.estatus?'CONECTADA':'CAÍDA'}</span></td>
+          <td class="ttime">${x.diferencia}</td>
+          <td class="ttime">${x.tiempo}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  function filtrar(q) {
+    document.querySelectorAll('tbody tr').forEach(tr=>{
+      tr.style.display = tr.dataset.n.includes(q.toLowerCase()) ? '' : 'none';
+    });
+  }
+
+  async function cargarDatos() {
+    document.getElementById('stxt').textContent = 'actualizando...';
+    try {
+      const r = await fetch(CSV_URL + '?t=' + Date.now());
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      datos = parsearCSV(await r.text());
+      renderMetricas(datos);
+      renderAlertas(datos);
+      renderTabla(datos);
+      ultimaAct = new Date();
+      document.getElementById('lastUpd').textContent =
+        ultimaAct.toLocaleString('es-MX', { timeZone: 'America/Mexico_City' });
+      document.getElementById('stxt').textContent = 'en línea';
+      document.querySelector('.dot').style.background = '#27ae60';
+    } catch(e) {
+      document.getElementById('tableCont').innerHTML =
+        '<div class="err">No se pudo cargar — ' + e.message + '</div>';
+      document.getElementById('stxt').textContent = 'error';
+      document.querySelector('.dot').style.background = '#e74c3c';
+    }
+  }
+
+  setInterval(()=>{
+    if (!ultimaAct) return;
+    const diff = Math.max(0, Math.floor((ultimaAct.getTime() + 1800000 - Date.now()) / 1000));
+    document.getElementById('nextUpd').textContent =
+      `Próxima en ${Math.floor(diff/60)}:${String(diff%60).padStart(2,'0')}`;
+  }, 1000);
+
+  cargarDatos();
+  setInterval(cargarDatos, 1800000);
+</script>
+</body>
+</html>
