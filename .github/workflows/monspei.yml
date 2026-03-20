@@ -39,8 +39,8 @@ jobs:
         run: |
           git config user.name  "Leo Gael Cruz Castañeda"
           git config user.email "leocruz.contacto@gmail.com"
-          git add salidas/all.csv \
-                  salidas/desconectados.csv \
-                  salidas/estado_anterior.json
+          git add -f salidas/all.csv \
+                     salidas/desconectados.csv \
+                     salidas/estado_anterior.json
           git diff --staged --quiet || git commit -m "auto: update SPEI $(date +'%d/%m/%Y %H:%M')"
           git push origin main
