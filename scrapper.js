@@ -335,12 +335,14 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
 
   // ── POKA-YOKE: garantizar archivos base siempre existan ──────
   const cab = 'Nombre,Estatus,Diferencia,Tiempo\n';
-  const rutaAll  = path.join(DIR, 'all.csv');
-  const rutaDisc = path.join(DIR, 'desconectados.csv');
-  const rutaHist = path.join(DIR, 'historial.csv');
-  if (!fs.existsSync(rutaAll))  fs.writeFileSync(rutaAll,  cab, 'utf8');
-  if (!fs.existsSync(rutaDisc)) fs.writeFileSync(rutaDisc, cab, 'utf8');
-  if (!fs.existsSync(rutaHist)) fs.writeFileSync(rutaHist, cab, 'utf8');
+  const rutaAll    = path.join(DIR, 'all.csv');
+  const rutaDisc   = path.join(DIR, 'desconectados.csv');
+  const rutaHist   = path.join(DIR, 'historial.csv');
+  if (!fs.existsSync(rutaAll))    fs.writeFileSync(rutaAll,    cab, 'utf8');
+  if (!fs.existsSync(rutaDisc))   fs.writeFileSync(rutaDisc,   cab, 'utf8');
+  if (!fs.existsSync(rutaHist))   fs.writeFileSync(rutaHist,   cab, 'utf8');
+  if (!fs.existsSync(ESTADO_FILE))
+    fs.writeFileSync(ESTADO_FILE, JSON.stringify({ _meta: { total: 0, timestamp: '' } }, null, 2), 'utf8');
 
   const timestamp = ahora();
   const hoy       = new Date();
