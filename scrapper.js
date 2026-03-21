@@ -22,6 +22,19 @@ const ENDPOINT = 'https://www.banxico.org.mx/monspei/mostrarInformacion.do';
 const DIR      = './salidas';
 const MARGEN   = 5 * 60 * 1000;
 
+// ─── FIN DE DÍA SPEI ──────────────────────────────────────────
+// Todos los días a las 18:00 el SPEI hace "Fin de día" y el endpoint
+// devuelve 0 entidades. No es una caída real — es un procedimiento normal.
+//
+// Elige UNA de estas dos opciones (cambia FIN_DIA_MODO):
+//   'omitir'          → No manda email. Silencioso. Solo alertas reales.
+//   'asunto-especial' → Manda email con asunto [FIN DE DÍA SPEI] para
+//                       filtrar con regla de correo y no saturar bandeja.
+//
+const FIN_DIA_MODO     = 'omitir';  // ← CAMBIA AQUÍ si quieren opción 1
+const FIN_DIA_HORA     = 18;        // hora inicio fin de día
+const FIN_DIA_DURACION = 2;         // horas que dura (hasta las 20:00)
+
 // ─── CONFIG EMAIL ── lee variables de entorno (GitHub Secrets) ─
 const EMAIL_CONFIG = {
   habilitado: !!(process.env.GMAIL_USER && process.env.GMAIL_PASS),
@@ -358,6 +371,62 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
     const r = await axios.post(ENDPOINT, 'dia='+DIA, { headers: HEADERS, timeout: 30000 });
     todos   = r.data.info || [];
     console.log(V+'OK'+X+' — '+todos.length+' entidades recibidas');
+
+    if (todos.length < 50) {
+      const horaActual = dayjs().tz(ZONA).hour();
+      const esFinDia   = horaActual >= FIN_DIA_HORA && horaActual < (FIN_DIA_HORA + FIN_DIA_DURACION);
+
+      if (esFinDia) {
+        console.log(AM+'  FIN DE DÍA SPEI detectado ('+todos.length+' entidades) — procedimiento normal de las '+FIN_DIA_HORA+':00'+X);
+
+        if (FIN_DIA_MODO === 'omitir') {
+          console.log(AM+'  Modo: OMITIR — sin email, sin guardar estado'+X);
+          console.log(V+'  Las entidades volverán a reportarse al reanudar operaciones'+X);
+          process.exit(0);
+
+        } else if (FIN_DIA_MODO === 'asunto-especial') {
+          console.log(AM+'  Modo: ASUNTO ESPECIAL — mandando email de fin de día'+X);
+          const asuntoFD  = `[FIN DE DÍA SPEI] Reinicio de conexiones — ${timestamp}`;
+          const htmlFD    = `
+<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#EDF2F7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#EDF2F7;padding:28px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:4px;border:1px solid #D0DAE8;">
+  <tr><td style="background:#1a3a5c;height:4px;font-size:0;">&nbsp;</td></tr>
+  <tr><td style="background:#1a3a5c;padding:22px 32px;">
+    <p style="margin:0 0 3px;font-size:10px;letter-spacing:2px;color:#7aadd4;text-transform:uppercase;font-weight:600;">Monitor de Conectividad SPEI</p>
+    <h1 style="margin:0;font-size:19px;font-weight:600;color:#fff;">Monitor SPEI</h1>
+  </td></tr>
+  <tr><td style="padding:24px 32px;background:#FEF8EC;border-bottom:1px solid #D0DAE8;">
+    <p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#8a5a00;">Fin de día SPEI — Procedimiento operativo normal</p>
+    <p style="margin:0;font-size:13px;color:#7a5500;line-height:1.6;">
+      Todos los días a las <strong>18:00 hrs</strong> el SPEI ejecuta el cierre de día operativo.<br>
+      Las entidades financieras reinician su conexión como parte del proceso.<br>
+      <strong>No se trata de una caída o incidente</strong> — es una operación programada.
+    </p>
+  </td></tr>
+  <tr><td style="background:#F7FAFD;border-top:1px solid #D0DAE8;padding:14px 32px;">
+    <p style="margin:0;font-size:10px;color:#9AACBF;line-height:1.7;">
+      <span style="color:#5a7a9a;font-weight:600;">MONSPEI v5</span> &nbsp;&middot;&nbsp; Banco de M&eacute;xico<br>
+      Monitoreo autom&aacute;tico &middot; Actualizaci&oacute;n cada 30 minutos
+    </p>
+  </td></tr>
+  <tr><td style="background:#1a3a5c;height:3px;font-size:0;">&nbsp;</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+          const textoFD = `[FIN DE DÍA SPEI] ${timestamp}\nProcedimiento operativo normal — reinicio de conexiones a las 18:00 hrs.\nNo es una caída ni incidente.`;
+          await enviarEmail(asuntoFD, htmlFD, textoFD);
+          process.exit(0);
+        }
+
+      } else {
+        console.log(AM+'  Respuesta sospechosa ('+todos.length+' entidades) fuera de horario fin de día'+X);
+        console.log(AM+'  Abortando sin guardar estado — verificar manualmente'+X);
+        process.exit(0);
+      }
+    }
   } catch(e) {
     console.log(R+'ERROR: '+e.message+X);
     process.exit(1);
