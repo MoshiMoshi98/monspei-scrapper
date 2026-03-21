@@ -37,7 +37,7 @@ jobs:
 
       - name: Guardar archivos en repo
         run: |
-          git config user.name  "Leo Gael Cruz Castañeda"
+          git config user.name  "Bot-Monspei"
           git config user.email "leocruz.contacto@gmail.com"
           git add -f salidas/all.csv \
                      salidas/desconectados.csv \
