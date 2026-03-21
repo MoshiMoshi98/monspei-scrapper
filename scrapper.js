@@ -33,7 +33,7 @@ const MARGEN   = 5 * 60 * 1000;
 //
 const FIN_DIA_MODO     = 'omitir';  // ← CAMBIA AQUÍ si quieren opción 1
 const FIN_DIA_HORA     = 18;        // hora inicio fin de día
-const FIN_DIA_DURACION = 2;         // horas que dura (hasta las 20:00)
+const FIN_DIA_DURACION = 12;        // horas que dura (18:00 → 06:00 AM)
 
 // ─── CONFIG EMAIL ── lee variables de entorno (GitHub Secrets) ─
 const EMAIL_CONFIG = {
@@ -374,7 +374,8 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
 
     if (todos.length < 50) {
       const horaActual = dayjs().tz(ZONA).hour();
-      const esFinDia   = horaActual >= FIN_DIA_HORA && horaActual < (FIN_DIA_HORA + FIN_DIA_DURACION);
+      // Cubre 18:00 → 06:00 AM (cruce de medianoche)
+      const esFinDia   = horaActual >= FIN_DIA_HORA || horaActual < (FIN_DIA_HORA + FIN_DIA_DURACION - 24);
 
       if (esFinDia) {
         console.log(AM+'  FIN DE DÍA SPEI detectado ('+todos.length+' entidades) — procedimiento normal de las '+FIN_DIA_HORA+':00'+X);
