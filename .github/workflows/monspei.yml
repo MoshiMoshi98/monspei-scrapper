@@ -37,8 +37,8 @@ jobs:
 
       - name: Guardar archivos en repo
         run: |
-          git config user.name  "Bot-Monspei"
-          git config user.email "leocruz.contacto@gmail.com"
+          git config user.name  "bot-monspei"
+          git config user.email "bot@monspei.local"
           git add -f salidas/all.csv \
                      salidas/desconectados.csv \
                      salidas/estado_anterior.json
