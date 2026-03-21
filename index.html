@@ -106,15 +106,18 @@
     }
     .al.r { background: var(--red-bg);   border-color: #e74c3c; }
     .al.g { background: var(--green-bg); border-color: #27ae60; }
+    .al.a { background: var(--amber-bg); border-color: #e67e22; }
     .aname { font-weight: 600; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
     .al.r .aname { color: var(--red); }
     .al.g .aname { color: var(--green); }
+    .al.a .aname { color: var(--amber); }
     .abadge {
       font-size: 10px; letter-spacing: .8px; padding: 2px 8px; border-radius: 3px;
       font-family: 'IBM Plex Mono', monospace; font-weight: 600;
     }
     .al.r .abadge { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-bd); }
     .al.g .abadge { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-bd); }
+    .al.a .abadge { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-bd); }
 
     /* TABLA */
     .tsec { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
@@ -144,11 +147,13 @@
       padding: 3px 9px; border-radius: 3px; font-size: 10px; font-weight: 600;
       font-family: 'IBM Plex Mono', monospace; letter-spacing: .5px;
     }
-    .bon { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-bd); }
-    .boff { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-bd); }
+    .bon  { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-bd); }
+    .boff { background: var(--red-bg);   color: var(--red);   border: 1px solid var(--red-bd); }
+    .brest{ background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-bd); }
     .bd { width: 5px; height: 5px; border-radius: 50%; }
-    .bon .bd { background: #27ae60; }
+    .bon  .bd { background: #27ae60; }
     .boff .bd { background: #e74c3c; }
+    .brest .bd { background: #e67e22; }
 
     /* FIN DE DÍA — estado vacío especial */
     .fin-dia-empty {
@@ -251,6 +256,14 @@
     return hora >= FIN_DIA_INICIO || hora < FIN_DIA_FIN;
   }
 
+  function esHorarioOperativo() {
+    const ahora = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
+    const hora  = new Date(ahora).getHours();
+    const min   = new Date(ahora).getMinutes();
+    const hm    = hora * 100 + min;
+    return hm >= 630 && hm < 1800;
+  }
+
   function mostrarBannerFinDia(visible) {
     const banner = document.getElementById('finDiaBanner');
     if (visible) banner.classList.add('visible');
@@ -298,13 +311,20 @@
       document.getElementById('alertsCont').innerHTML = '';
       return;
     }
+    const nocturno = !esHorarioOperativo();
     const disc = d.filter(x=>!x.estatus);
     const c = document.getElementById('alertsCont');
     c.innerHTML = disc.map(x=>`
-      <div class="al r">
+      <div class="al ${nocturno ? 'a' : 'r'}">
         <span class="aname">● ${x.nombre}</span>
-        <span class="abadge">DESCONECTADA</span>
+        <span class="abadge">${nocturno ? 'EN REPOSO' : 'DESCONECTADA'}</span>
       </div>`).join('');
+  }
+
+  function badgeEstado(x, nocturno) {
+    if (x.estatus)        return '<span class="badge bon"><span class="bd"></span>CONECTADA</span>';
+    if (nocturno)         return '<span class="badge brest"><span class="bd"></span>EN REPOSO</span>';
+    return                       '<span class="badge boff"><span class="bd"></span>CAÍDA</span>';
   }
 
   function renderTabla(d, esFinDia) {
@@ -322,13 +342,14 @@
       return;
     }
     if (!d.length) { c.innerHTML='<div class="err">Sin datos</div>'; return; }
+    const nocturno = !esHorarioOperativo();
     c.innerHTML = `<table>
       <thead><tr><th>#</th><th>Entidad financiera</th><th>Estado</th><th>Última actividad</th><th>Captura</th></tr></thead>
       <tbody>${d.map((x,i)=>`
         <tr data-n="${x.nombre.toLowerCase()}">
           <td class="num">${String(i+1).padStart(2,'0')}</td>
           <td style="font-weight:500">${x.nombre}</td>
-          <td><span class="badge ${x.estatus?'bon':'boff'}"><span class="bd"></span>${x.estatus?'CONECTADA':'CAÍDA'}</span></td>
+          <td>${badgeEstado(x, nocturno)}</td>
           <td class="ttime">${x.diferencia}</td>
           <td class="ttime">${x.tiempo}</td>
         </tr>`).join('')}
