@@ -484,7 +484,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   // 06:00-06:29 gracia mañana → silencio total
   // 06:30-17:59 operativo     → todo
   // 18:00-18:29 gracia tarde  → silencio total
-  // 18:30-05:59 nocturno      → solo ENTIDAD_NUEVA / ENTIDAD_REMOVIDA
+  // 18:30-05:59 nocturno      → todo (igual que operativo)
   console.log('');
   if (!estadoAnterior) {
     console.log('  Email: '+AM+'omitido (primera corrida)'+X);
@@ -492,26 +492,14 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
     console.log('  Email: '+V+'omitido (sin cambios)'+X);
   } else if (esGracia()) {
     console.log('  Email: '+AM+'omitido (período de gracia — transición operativa normal)'+X);
-  } else if (esOperativoPleno()) {
+  } else {
+    // Operativo 06:30-17:59 y Nocturno 18:30-05:59 → manda todo
     const { asunto, html, texto } = construirEmail(
       conn, disc, seCayeron, seReconectaron,
       entidadesNuevas, entidadesRemovidas,
       bancos.length, timestamp
     );
     await enviarEmail(asunto, html, texto);
-  } else {
-    // Nocturno 18:30-05:59 — solo cambios estructurales
-    if (entidadesNuevas.length > 0 || entidadesRemovidas.length > 0) {
-      console.log('  Email: '+V+'enviando (cambio estructural SPEI en horario nocturno)'+X);
-      const { asunto, html, texto } = construirEmail(
-        conn, disc, [], [],
-        entidadesNuevas, entidadesRemovidas,
-        bancos.length, timestamp
-      );
-      await enviarEmail(asunto, html, texto);
-    } else {
-      console.log('  Email: '+AM+'omitido (nocturno 18:30-05:59 — caídas/reconexiones normales)'+X);
-    }
   }
 
   // ── 8. Guardar estado ───────────────────────────────────────
