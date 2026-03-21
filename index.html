@@ -238,17 +238,17 @@
 <script>
   const CSV_URL = 'https://raw.githubusercontent.com/MoshiMoshi98/monspei-scrapper/main/salidas/all.csv';
 
-  // Horario fin de día SPEI (hora Ciudad de México)
-  const FIN_DIA_INICIO  = 18; // 18:00
-  const FIN_DIA_FIN     = 20; // 20:00
+  // Horario fin de día SPEI — cubre 18:00 → 06:00 AM (overnight)
+  const FIN_DIA_INICIO = 18;
+  const FIN_DIA_FIN    = 6;
 
-  let datos    = [];
+  let datos     = [];
   let ultimaAct = null;
 
   function esHorarioFinDia() {
     const ahora = new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
     const hora  = new Date(ahora).getHours();
-    return hora >= FIN_DIA_INICIO && hora < FIN_DIA_FIN;
+    return hora >= FIN_DIA_INICIO || hora < FIN_DIA_FIN;
   }
 
   function mostrarBannerFinDia(visible) {
@@ -372,10 +372,23 @@
       }
 
     } catch(e) {
-      document.getElementById('tableCont').innerHTML =
-        '<div class="err">No se pudo cargar — ' + e.message + '</div>';
-      document.getElementById('stxt').textContent = 'error';
-      document.getElementById('dotEl').style.background = '#e74c3c';
+      const esFinDia = esHorarioFinDia();
+      if (esFinDia) {
+        renderMetricas([], true);
+        renderAlertas([], true);
+        renderTabla([], true);
+        mostrarBannerFinDia(true);
+        ultimaAct = new Date();
+        document.getElementById('lastUpd').textContent =
+          ultimaAct.toLocaleString('es-MX', { timeZone: 'America/Mexico_City' });
+        document.getElementById('stxt').textContent = 'fin de día';
+        document.getElementById('dotEl').style.background = '#e67e22';
+      } else {
+        document.getElementById('tableCont').innerHTML =
+          '<div class="err">No se pudo cargar — ' + e.message + '</div>';
+        document.getElementById('stxt').textContent = 'error';
+        document.getElementById('dotEl').style.background = '#e74c3c';
+      }
     }
   }
 
