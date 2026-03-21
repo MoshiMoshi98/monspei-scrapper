@@ -22,18 +22,25 @@ const ENDPOINT = 'https://www.banxico.org.mx/monspei/mostrarInformacion.do';
 const DIR      = './salidas';
 const MARGEN   = 5 * 60 * 1000;
 
-// ─── FIN DE DÍA SPEI ──────────────────────────────────────────
-// Todos los días a las 18:00 el SPEI hace "Fin de día" y el endpoint
-// devuelve 0 entidades. No es una caída real — es un procedimiento normal.
-//
-// Elige UNA de estas dos opciones (cambia FIN_DIA_MODO):
-//   'omitir'          → No manda email. Silencioso. Solo alertas reales.
-//   'asunto-especial' → Manda email con asunto [FIN DE DÍA SPEI] para
-//                       filtrar con regla de correo y no saturar bandeja.
-//
-const FIN_DIA_MODO     = 'omitir';  // ← CAMBIA AQUÍ si quieren opción 1
-const FIN_DIA_HORA     = 18;        // hora inicio fin de día
-const FIN_DIA_DURACION = 12;        // horas que dura (18:00 → 06:00 AM)
+// ─── HORARIO OPERATIVO SPEI ────────────────────────────────────
+// 06:00-06:29 → Gracia mañana   — reconexiones normales, sin emails
+// 06:30-17:59 → Operativo pleno — emails para todo
+// 18:00-18:29 → Gracia tarde    — caídas normales, sin emails
+// 18:30-05:59 → Overnight       — solo emails si hay ENTIDAD_NUEVA/REMOVIDA
+
+const esOperativoPleno = () => {
+  const hora = dayjs().tz(ZONA).hour();
+  const min  = dayjs().tz(ZONA).minute();
+  // 06:30 → 17:59
+  return (hora === 6 && min >= 30) || (hora > 6 && hora < 18);
+};
+
+const esGracia = () => {
+  const hora = dayjs().tz(ZONA).hour();
+  const min  = dayjs().tz(ZONA).minute();
+  // 06:00-06:29 (gracia mañana) o 18:00-18:29 (gracia tarde)
+  return (hora === 6 && min < 30) || (hora === 18 && min < 30);
+};
 
 // ─── CONFIG EMAIL ── lee variables de entorno (GitHub Secrets) ─
 const EMAIL_CONFIG = {
@@ -236,9 +243,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#EDF2F7;padding:28px 0;">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:4px;overflow:hidden;border:1px solid #D0DAE8;">
-
         <tr><td style="background:#1a3a5c;height:4px;font-size:0;">&nbsp;</td></tr>
-
         <tr>
           <td style="background:#1a3a5c;padding:22px 32px;">
             <table width="100%" cellpadding="0" cellspacing="0">
@@ -254,7 +259,6 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
             </table>
           </td>
         </tr>
-
         <tr>
           <td style="padding:22px 32px 20px;background:#F7FAFD;border-bottom:1px solid #D0DAE8;">
             <table width="100%" cellpadding="0" cellspacing="0">
@@ -282,9 +286,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
             </table>
           </td>
         </tr>
-
         ${(seccionCambios || seccionDisc) ? `<tr><td style="padding:20px 32px 24px;"><p style="margin:0 0 14px;font-size:10px;font-weight:600;letter-spacing:1.5px;color:#7A8CA3;text-transform:uppercase;">Cambios detectados</p>${seccionCambios}${seccionDisc}</td></tr>` : ''}
-
         <tr>
           <td style="background:#F7FAFD;border-top:1px solid #D0DAE8;padding:14px 32px;">
             <table width="100%" cellpadding="0" cellspacing="0">
@@ -302,9 +304,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
             </table>
           </td>
         </tr>
-
         <tr><td style="background:#1a3a5c;height:3px;font-size:0;">&nbsp;</td></tr>
-
       </table>
     </td></tr>
   </table>
@@ -333,7 +333,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
 (async () => {
   if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
 
-  // ── POKA-YOKE: garantizar que los archivos base siempre existan ──
+  // ── POKA-YOKE: garantizar archivos base siempre existan ──────
   const cab = 'Nombre,Estatus,Diferencia,Tiempo\n';
   const rutaAll  = path.join(DIR, 'all.csv');
   const rutaDisc = path.join(DIR, 'desconectados.csv');
@@ -350,6 +350,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   const FECHA     = hoy.getFullYear()+'/'
                   + String(hoy.getMonth()+1).padStart(2,'0')+'/'
                   + String(hoy.getDate()).padStart(2,'0');
+  const horarioActual = esGracia() ? 'GRACIA' : esOperativoPleno() ? 'OPERATIVO' : 'NOCTURNO';
 
   console.log('');
   console.log(B+'  ╔══════════════════════════════════════════════════════╗'+X);
@@ -357,6 +358,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   console.log(B+'  ╚══════════════════════════════════════════════════════╝'+X);
   console.log('  Fecha    : ' + FECHA);
   console.log('  Capturado: ' + timestamp);
+  console.log('  Horario  : ' + (horarioActual === 'OPERATIVO' ? V : AM) + horarioActual + X);
   console.log('  Email    : ' + (EMAIL_CONFIG.habilitado ? V+'ACTIVO → '+EMAIL_CONFIG.para+X : AM+'deshabilitado'+X));
   console.log('');
 
@@ -379,63 +381,10 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
     process.stdout.write('  Consultando MONSPEI... ');
     const r = await axios.post(ENDPOINT, 'dia='+DIA, { headers: HEADERS, timeout: 30000 });
     todos   = r.data.info || [];
-    console.log(V+'OK'+X+' — '+todos.length+' entidades recibidas');
-
+    console.log(V+'OK'+X+' — '+todos.length+' entidades recibidas de Banxico');
     if (todos.length < 50) {
-      const horaActual = dayjs().tz(ZONA).hour();
-      // Cubre 18:00 → 06:00 AM (cruce de medianoche)
-      const esFinDia   = horaActual >= FIN_DIA_HORA || horaActual < (FIN_DIA_HORA + FIN_DIA_DURACION - 24);
-
-      if (esFinDia) {
-        console.log(AM+'  FIN DE DÍA SPEI detectado ('+todos.length+' entidades) — procedimiento normal de las '+FIN_DIA_HORA+':00'+X);
-
-        if (FIN_DIA_MODO === 'omitir') {
-          console.log(AM+'  Modo: OMITIR — sin email, sin guardar estado'+X);
-          console.log(V+'  Las entidades volverán a reportarse al reanudar operaciones'+X);
-          process.exit(0);
-
-        } else if (FIN_DIA_MODO === 'asunto-especial') {
-          console.log(AM+'  Modo: ASUNTO ESPECIAL — mandando email de fin de día'+X);
-          const asuntoFD  = `[FIN DE DÍA SPEI] Reinicio de conexiones — ${timestamp}`;
-          const htmlFD    = `
-<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#EDF2F7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#EDF2F7;padding:28px 0;">
-<tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:4px;border:1px solid #D0DAE8;">
-  <tr><td style="background:#1a3a5c;height:4px;font-size:0;">&nbsp;</td></tr>
-  <tr><td style="background:#1a3a5c;padding:22px 32px;">
-    <p style="margin:0 0 3px;font-size:10px;letter-spacing:2px;color:#7aadd4;text-transform:uppercase;font-weight:600;">Monitor de Conectividad SPEI</p>
-    <h1 style="margin:0;font-size:19px;font-weight:600;color:#fff;">Monitor SPEI</h1>
-  </td></tr>
-  <tr><td style="padding:24px 32px;background:#FEF8EC;border-bottom:1px solid #D0DAE8;">
-    <p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#8a5a00;">Fin de día SPEI — Procedimiento operativo normal</p>
-    <p style="margin:0;font-size:13px;color:#7a5500;line-height:1.6;">
-      Todos los días a las <strong>18:00 hrs</strong> el SPEI ejecuta el cierre de día operativo.<br>
-      Las entidades financieras reinician su conexión como parte del proceso.<br>
-      <strong>No se trata de una caída o incidente</strong> — es una operación programada.
-    </p>
-  </td></tr>
-  <tr><td style="background:#F7FAFD;border-top:1px solid #D0DAE8;padding:14px 32px;">
-    <p style="margin:0;font-size:10px;color:#9AACBF;line-height:1.7;">
-      <span style="color:#5a7a9a;font-weight:600;">MONSPEI v5</span> &nbsp;&middot;&nbsp; Banco de M&eacute;xico<br>
-      Monitoreo autom&aacute;tico &middot; Actualizaci&oacute;n cada 30 minutos
-    </p>
-  </td></tr>
-  <tr><td style="background:#1a3a5c;height:3px;font-size:0;">&nbsp;</td></tr>
-</table>
-</td></tr></table>
-</body></html>`;
-          const textoFD = `[FIN DE DÍA SPEI] ${timestamp}\nProcedimiento operativo normal — reinicio de conexiones a las 18:00 hrs.\nNo es una caída ni incidente.`;
-          await enviarEmail(asuntoFD, htmlFD, textoFD);
-          process.exit(0);
-        }
-
-      } else {
-        console.log(AM+'  Respuesta sospechosa ('+todos.length+' entidades) fuera de horario fin de día'+X);
-        console.log(AM+'  Abortando sin guardar estado — verificar manualmente'+X);
-        process.exit(0);
-      }
+      console.log(AM+'  Solo '+todos.length+' entidades — abortando sin guardar estado'+X);
+      process.exit(0);
     }
   } catch(e) {
     console.log(R+'ERROR: '+e.message+X);
@@ -531,26 +480,44 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   }
   console.log('  '+B+'─'.repeat(68)+X);
 
-  // ── 7. Enviar email si hay cambios ──────────────────────────
+  // ── 7. Email según horario ──────────────────────────────────
+  // 06:00-06:29 gracia mañana → silencio total
+  // 06:30-17:59 operativo     → todo
+  // 18:00-18:29 gracia tarde  → silencio total
+  // 18:30-05:59 nocturno      → solo ENTIDAD_NUEVA / ENTIDAD_REMOVIDA
   console.log('');
   if (!estadoAnterior) {
     console.log('  Email: '+AM+'omitido (primera corrida)'+X);
   } else if (!hayCambios) {
     console.log('  Email: '+V+'omitido (sin cambios)'+X);
-  } else {
+  } else if (esGracia()) {
+    console.log('  Email: '+AM+'omitido (período de gracia — transición operativa normal)'+X);
+  } else if (esOperativoPleno()) {
     const { asunto, html, texto } = construirEmail(
       conn, disc, seCayeron, seReconectaron,
       entidadesNuevas, entidadesRemovidas,
       bancos.length, timestamp
     );
     await enviarEmail(asunto, html, texto);
+  } else {
+    // Nocturno 18:30-05:59 — solo cambios estructurales
+    if (entidadesNuevas.length > 0 || entidadesRemovidas.length > 0) {
+      console.log('  Email: '+V+'enviando (cambio estructural SPEI en horario nocturno)'+X);
+      const { asunto, html, texto } = construirEmail(
+        conn, disc, [], [],
+        entidadesNuevas, entidadesRemovidas,
+        bancos.length, timestamp
+      );
+      await enviarEmail(asunto, html, texto);
+    } else {
+      console.log('  Email: '+AM+'omitido (nocturno 18:30-05:59 — caídas/reconexiones normales)'+X);
+    }
   }
 
   // ── 8. Guardar estado ───────────────────────────────────────
   guardarEstado(bancos);
 
-  // ── 9. CSV Poka-Yoke ────────────────────────────────────────
-
+  // ── 9. CSV ──────────────────────────────────────────────────
   const rutaSnap = path.join(DIR, 'snapshot_inicial.txt');
   if (!fs.existsSync(rutaSnap)) {
     const lineas = [
@@ -581,9 +548,8 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
     ? cab + disc.map(b=>'"'+b.nombre.replace(/"/g,'""')+'",false,'+b.diferencia+','+timestamp).join('\n')+'\n'
     : cab, 'utf8');
 
-  const esNuevoHist = !fs.existsSync(rutaHist);
   fs.appendFileSync(rutaHist,
-    (esNuevoHist ? cab : '') + bancos.map(b=>
+    bancos.map(b=>
       '"'+b.nombre.replace(/"/g,'""')+'",'+(b.estatus?'true':'false')+','+b.diferencia+','+timestamp
     ).join('\n')+'\n', 'utf8');
 
