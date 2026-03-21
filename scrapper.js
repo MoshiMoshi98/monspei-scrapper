@@ -333,6 +333,15 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
 (async () => {
   if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
 
+  // ── POKA-YOKE: garantizar que los archivos base siempre existan ──
+  const cab = 'Nombre,Estatus,Diferencia,Tiempo\n';
+  const rutaAll  = path.join(DIR, 'all.csv');
+  const rutaDisc = path.join(DIR, 'desconectados.csv');
+  const rutaHist = path.join(DIR, 'historial.csv');
+  if (!fs.existsSync(rutaAll))  fs.writeFileSync(rutaAll,  cab, 'utf8');
+  if (!fs.existsSync(rutaDisc)) fs.writeFileSync(rutaDisc, cab, 'utf8');
+  if (!fs.existsSync(rutaHist)) fs.writeFileSync(rutaHist, cab, 'utf8');
+
   const timestamp = ahora();
   const hoy       = new Date();
   const DIA       = hoy.getFullYear()
@@ -541,7 +550,6 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   guardarEstado(bancos);
 
   // ── 9. CSV Poka-Yoke ────────────────────────────────────────
-  const cab = 'Nombre,Estatus,Diferencia,Tiempo\n';
 
   const rutaSnap = path.join(DIR, 'snapshot_inicial.txt');
   if (!fs.existsSync(rutaSnap)) {
@@ -565,17 +573,14 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
     console.log('  '+V+'Snapshot inicial guardado (primera vez)'+X);
   }
 
-  const rutaAll  = path.join(DIR, 'all.csv');
   fs.writeFileSync(rutaAll, cab + bancos.map(b=>
     '"'+b.nombre.replace(/"/g,'""')+'",'+(b.estatus?'true':'false')+','+b.diferencia+','+timestamp
   ).join('\n')+'\n', 'utf8');
 
-  const rutaDisc = path.join(DIR, 'desconectados.csv');
   fs.writeFileSync(rutaDisc, disc.length > 0
     ? cab + disc.map(b=>'"'+b.nombre.replace(/"/g,'""')+'",false,'+b.diferencia+','+timestamp).join('\n')+'\n'
     : cab, 'utf8');
 
-  const rutaHist = path.join(DIR, 'historial.csv');
   const esNuevoHist = !fs.existsSync(rutaHist);
   fs.appendFileSync(rutaHist,
     (esNuevoHist ? cab : '') + bancos.map(b=>
