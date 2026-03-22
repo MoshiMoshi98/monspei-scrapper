@@ -28,9 +28,9 @@ jobs:
           GMAIL_PARA: ${{ secrets.GMAIL_PARA }}
         run: node scrapper.js
       - name: Guardar archivos en repo
-        run: |
-          git config user.name  "bot-monspei"
-          git config user.email "bot@monspei.local"
-          git add -f salidas/ 2>/dev/null || true
-          git diff --staged --quiet || git commit -m "auto: update SPEI $(date +'%d/%m/%Y %H:%M')"
-          git push origin main
+              run: |
+                git config user.name  "bot-monspei"
+                git config user.email "bot@monspei.local"
+                git add salidas/all.csv salidas/desconectados.csv salidas/estado_anterior.json salidas/historial.csv 2>/dev/null || true
+                git diff --staged --quiet || git commit -m "auto: update SPEI $(date +'%d/%m/%Y %H:%M')"
+                git push origin main || true
