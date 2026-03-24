@@ -1,10 +1,10 @@
 {
   "_meta": {
     "total": 94,
-    "timestamp": "23/03/2026 23:38:51"
+    "timestamp": "24/03/2026 02:07:42"
   },
   "ACTINVER": true,
-  "AFIRME": false,
+  "AFIRME": true,
   "ARCUS FI": true,
   "ASP INTEGRA OPC": true,
   "AZTECA": true,
@@ -87,11 +87,11 @@
   "SPIN BY OXXO": true,
   "STP": true,
   "Swap": true,
-  "TESORED": false,
+  "TESORED": true,
   "TRANSFER": true,
   "TRANSFER DIRECT": false,
   "UALA": true,
-  "UNAGRA": false,
+  "UNAGRA": true,
   "VALMEX": false,
   "VALUE": true,
   "VE POR MAS": true,
