@@ -1,10 +1,10 @@
 {
   "_meta": {
     "total": 94,
-    "timestamp": "23/03/2026 22:01:35"
+    "timestamp": "23/03/2026 23:38:51"
   },
   "ACTINVER": true,
-  "AFIRME": true,
+  "AFIRME": false,
   "ARCUS FI": true,
   "ASP INTEGRA OPC": true,
   "AZTECA": true,
@@ -87,7 +87,7 @@
   "SPIN BY OXXO": true,
   "STP": true,
   "Swap": true,
-  "TESORED": true,
+  "TESORED": false,
   "TRANSFER": true,
   "TRANSFER DIRECT": false,
   "UALA": true,
