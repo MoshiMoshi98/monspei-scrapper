@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "25/03/2026 02:03:01"
+    "timestamp": "25/03/2026 05:10:50"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -24,7 +24,7 @@
   "BANREGIO": true,
   "BANSI": true,
   "BANXICO": true,
-  "BARCLAYS": false,
+  "BARCLAYS": true,
   "BBASE": true,
   "BBVA MEXICO": true,
   "BMONEX": true,
