@@ -9,42 +9,40 @@ const nodemailer = require('nodemailer');
 dayjs.extend(utc);
 dayjs.extend(tzp);
 
+// ─── COLORES TERMINAL ──────────────────────────────────────────
 const V  = '\x1b[32m';
 const R  = '\x1b[31m';
 const AM = '\x1b[33m';
 const B  = '\x1b[1m';
 const X  = '\x1b[0m';
 
+// ─── CONFIG GENERAL ────────────────────────────────────────────
 const ZONA     = 'America/Mexico_City';
 const ENDPOINT = 'https://www.banxico.org.mx/monspei/mostrarInformacion.do';
 const DIR      = './salidas';
 const MARGEN   = 5 * 60 * 1000;
 
-// ─── HORARIO ────────────────────────────────────────────────────
-// 06:00-06:29 → Gracia mañana   — silencio
-// 06:30-17:59 → Operativo pleno — emails normales
-// 18:00-18:29 → Gracia tarde    — silencio
-// 18:30-05:59 → Nocturno        — emails si hay cambios
-// Sáb/Dom     → Fin de semana   — EN REPOSO, sin emails de caídas masivas
+// ─── HORARIO OPERATIVO SPEI ────────────────────────────────────
+// 06:00-06:29 → Gracia mañana   — reconexiones normales, sin emails
+// 06:30-17:59 → Operativo pleno — emails para todo
+// 18:00-18:29 → Gracia tarde    — caídas normales, sin emails
+// 18:30-05:59 → Overnight       — solo emails si hay ENTIDAD_NUEVA/REMOVIDA
 
 const esOperativoPleno = () => {
-  const h = dayjs().tz(ZONA).hour();
-  const m = dayjs().tz(ZONA).minute();
-  return (h === 6 && m >= 30) || (h > 6 && h < 18);
+  const hora = dayjs().tz(ZONA).hour();
+  const min  = dayjs().tz(ZONA).minute();
+  // 06:30 → 17:59
+  return (hora === 6 && min >= 30) || (hora > 6 && hora < 18);
 };
 
 const esGracia = () => {
-  const h = dayjs().tz(ZONA).hour();
-  const m = dayjs().tz(ZONA).minute();
-  return (h === 6 && m < 30) || (h === 18 && m < 30);
+  const hora = dayjs().tz(ZONA).hour();
+  const min  = dayjs().tz(ZONA).minute();
+  // 06:00-06:29 (gracia mañana) o 18:00-18:29 (gracia tarde)
+  return (hora === 6 && min < 30) || (hora === 18 && min < 30);
 };
 
-const esFinDeSemana = () => {
-  const dia = dayjs().tz(ZONA).day(); // 0=domingo, 6=sábado
-  return dia === 0 || dia === 6;
-};
-
-// ─── CONFIG EMAIL ────────────────────────────────────────────────
+// ─── CONFIG EMAIL ── lee variables de entorno (GitHub Secrets) ─
 const EMAIL_CONFIG = {
   habilitado: !!(process.env.GMAIL_USER && process.env.GMAIL_PASS),
   smtp: {
@@ -60,6 +58,7 @@ const EMAIL_CONFIG = {
   para: process.env.GMAIL_PARA || '',
 };
 
+// ─── ARCHIVO DE ESTADO ANTERIOR ───────────────────────────────
 const ESTADO_FILE = path.join(DIR, 'estado_anterior.json');
 
 const HEADERS = {
@@ -71,6 +70,7 @@ const HEADERS = {
   'Referer':          'https://www.banxico.org.mx/monspei/',
 };
 
+// ─── HELPERS ──────────────────────────────────────────────────
 const fmt   = ts => dayjs(ts).tz(ZONA).format('DD/MM/YY HH:mm:ss');
 const ahora = ()  => dayjs().tz(ZONA).format('DD/MM/YYYY HH:mm:ss');
 
@@ -85,6 +85,7 @@ const isConn = (p) => {
   return (Date.now() - sorted[0].fin) <= MARGEN;
 };
 
+// ─── LEER / GUARDAR ESTADO ────────────────────────────────────
 const leerEstadoAnterior = () => {
   try {
     if (fs.existsSync(ESTADO_FILE))
@@ -99,6 +100,7 @@ const guardarEstado = (bancos) => {
   fs.writeFileSync(ESTADO_FILE, JSON.stringify(estado, null, 2), 'utf8');
 };
 
+// ─── DETECTAR CAMBIOS ─────────────────────────────────────────
 const detectarCambios = (bancos, anterior) => {
   if (!anterior) return {
     seCayeron: [], seReconectaron: [],
@@ -124,6 +126,7 @@ const detectarCambios = (bancos, anterior) => {
   return { seCayeron, seReconectaron, entidadesNuevas, entidadesRemovidas, hayCambios };
 };
 
+// ─── ENVIAR EMAIL ─────────────────────────────────────────────
 const enviarEmail = async (asunto, html, texto) => {
   if (!EMAIL_CONFIG.habilitado) {
     console.log('  Email: ' + AM + 'deshabilitado' + X);
@@ -145,6 +148,7 @@ const enviarEmail = async (asunto, html, texto) => {
   }
 };
 
+// ─── CONSTRUIR EMAIL HTML ─────────────────────────────────────
 const construirEmail = (conn, disc, seCayeron, seReconectaron,
                         entidadesNuevas, entidadesRemovidas, total, timestamp) => {
 
@@ -217,13 +221,24 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
     seccionCambios += `<p style="margin:0 0 8px;font-size:10px;font-weight:600;letter-spacing:1.2px;color:#1a7a40;text-transform:uppercase;">Se reconectaron (${seReconectaron.length})</p>${filas}`;
   }
 
-  // No se incluye lista de desconectadas — solo los cambios relevantes
   let seccionDisc = '';
+  if (disc.length > 0) {
+    const filas = disc.map(b =>
+      `<div style="border:1px solid #f5c6c6;border-left:3px solid #e74c3c;border-radius:0 4px 4px 0;background:#fdf4f4;padding:10px 16px;margin-bottom:5px;display:flex;align-items:center;gap:10px;">
+        <div style="width:5px;height:5px;border-radius:50%;background:#e74c3c;"></div>
+        <span style="font-size:12px;color:#7a2020;font-weight:500;">${b.nombre}</span>
+      </div>`
+    ).join('');
+    seccionDisc = `<p style="margin:16px 0 8px;font-size:10px;font-weight:600;letter-spacing:1.2px;color:#9AACBF;text-transform:uppercase;">Total desconectados ahora (${disc.length})</p>${filas}`;
+  }
 
   const html = `
 <!DOCTYPE html>
 <html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
 <body style="margin:0;padding:0;background:#EDF2F7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#EDF2F7;padding:28px 0;">
     <tr><td align="center">
@@ -274,10 +289,19 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
         ${(seccionCambios || seccionDisc) ? `<tr><td style="padding:20px 32px 24px;"><p style="margin:0 0 14px;font-size:10px;font-weight:600;letter-spacing:1.5px;color:#7A8CA3;text-transform:uppercase;">Cambios detectados</p>${seccionCambios}${seccionDisc}</td></tr>` : ''}
         <tr>
           <td style="background:#F7FAFD;border-top:1px solid #D0DAE8;padding:14px 32px;">
-            <p style="margin:0;font-size:10px;color:#9AACBF;line-height:1.7;">
-              <span style="color:#5a7a9a;font-weight:600;">MONSPEI v5</span> &nbsp;&middot;&nbsp; Banco de M&eacute;xico<br>
-              Monitoreo autom&aacute;tico &middot; Actualizaci&oacute;n cada 30 minutos
-            </p>
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td>
+                  <p style="margin:0;font-size:10px;color:#9AACBF;line-height:1.7;">
+                    <span style="color:#5a7a9a;font-weight:600;">MONSPEI v5</span> &nbsp;&middot;&nbsp; Banco de M&eacute;xico<br>
+                    Monitoreo autom&aacute;tico &middot; Actualizaci&oacute;n cada 30 minutos
+                  </p>
+                </td>
+                <td align="right" style="vertical-align:middle;">
+                  <div style="background:#1a3a5c;border-radius:3px;padding:4px 10px;font-size:10px;color:#7aadd4;white-space:nowrap;font-weight:600;letter-spacing:0.5px;">MONSPEI v5</div>
+                </td>
+              </tr>
+            </table>
           </td>
         </tr>
         <tr><td style="background:#1a3a5c;height:3px;font-size:0;">&nbsp;</td></tr>
@@ -288,11 +312,14 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
 </html>`;
 
   const texto = [
-    'MONSPEI — Monitor SPEI', timestamp, '',
+    'MONSPEI — Monitor SPEI Banxico',
+    timestamp,
+    '',
     'Conectados   : ' + conn.length,
     'Desconectados: ' + disc.length,
     'Disponibilidad: ' + pct + '%',
-    'Total SPEI   : ' + total + ' entidades', '',
+    'Total SPEI   : ' + total + ' entidades',
+    '',
     seCayeron.length > 0      ? 'SE CAYERON:\n' + seCayeron.map(b=>'  x '+b.nombre).join('\n') : '',
     seReconectaron.length > 0 ? 'SE RECONECTARON:\n' + seReconectaron.map(b=>'  + '+b.nombre).join('\n') : '',
     entidadesNuevas.length > 0? 'ENTIDADES NUEVAS:\n' + entidadesNuevas.map(b=>'  * '+b.nombre).join('\n') : '',
@@ -302,14 +329,15 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   return { asunto, html, texto };
 };
 
-// ─── MAIN ────────────────────────────────────────────────────────
+// ─── MAIN ─────────────────────────────────────────────────────
 (async () => {
   if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
 
+  // ── POKA-YOKE: garantizar archivos base siempre existan ──────
   const cab = 'Nombre,Estatus,Diferencia,Tiempo\n';
-  const rutaAll  = path.join(DIR, 'all.csv');
-  const rutaDisc = path.join(DIR, 'desconectados.csv');
-  const rutaHist = path.join(DIR, 'historial.csv');
+  const rutaAll    = path.join(DIR, 'all.csv');
+  const rutaDisc   = path.join(DIR, 'desconectados.csv');
+  const rutaHist   = path.join(DIR, 'historial.csv');
   if (!fs.existsSync(rutaAll))    fs.writeFileSync(rutaAll,    cab, 'utf8');
   if (!fs.existsSync(rutaDisc))   fs.writeFileSync(rutaDisc,   cab, 'utf8');
   if (!fs.existsSync(rutaHist))   fs.writeFileSync(rutaHist,   cab, 'utf8');
@@ -324,12 +352,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   const FECHA     = hoy.getFullYear()+'/'
                   + String(hoy.getMonth()+1).padStart(2,'0')+'/'
                   + String(hoy.getDate()).padStart(2,'0');
-
-  const fds = esFinDeSemana();
-  const horarioActual = fds ? 'FIN DE SEMANA'
-    : esGracia() ? 'GRACIA'
-    : esOperativoPleno() ? 'OPERATIVO'
-    : 'NOCTURNO';
+  const horarioActual = esGracia() ? 'GRACIA' : esOperativoPleno() ? 'OPERATIVO' : 'NOCTURNO';
 
   console.log('');
   console.log(B+'  ╔══════════════════════════════════════════════════════╗'+X);
@@ -341,6 +364,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   console.log('  Email    : ' + (EMAIL_CONFIG.habilitado ? V+'ACTIVO → '+EMAIL_CONFIG.para+X : AM+'deshabilitado'+X));
   console.log('');
 
+  // ── 1. Estado anterior ──────────────────────────────────────
   const estadoAnterior = leerEstadoAnterior();
   if (estadoAnterior) {
     const totalAntes = estadoAnterior._meta ? estadoAnterior._meta.total
@@ -353,6 +377,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   }
   console.log('');
 
+  // ── 2. Consultar MONSPEI ────────────────────────────────────
   let todos;
   try {
     process.stdout.write('  Consultando MONSPEI... ');
@@ -368,6 +393,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
     process.exit(1);
   }
 
+  // ── 3. Clasificar ───────────────────────────────────────────
   const bancos = todos.map(item => {
     const p      = item.periodos || [];
     const sorted = sortPeriodos(p);
@@ -385,9 +411,11 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   const conn = bancos.filter(b =>  b.estatus);
   const disc = bancos.filter(b => !b.estatus);
 
+  // ── 4. Detectar cambios ─────────────────────────────────────
   const { seCayeron, seReconectaron, entidadesNuevas, entidadesRemovidas, hayCambios }
     = detectarCambios(bancos, estadoAnterior);
 
+  // ── 5. Tabla terminal ───────────────────────────────────────
   console.log('');
   console.log('  '+'-'.repeat(80));
   console.log('  No.  Estado     Entidad                Inicio             Fin');
@@ -418,6 +446,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
     });
   }
 
+  // ── 6. Cambios terminal ─────────────────────────────────────
   console.log('');
   console.log('  '+B+'─── CAMBIOS DETECTADOS '+'─'.repeat(46)+X);
   if (!estadoAnterior) {
@@ -453,33 +482,20 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   }
   console.log('  '+B+'─'.repeat(68)+X);
 
-  // ── EMAIL según horario ──────────────────────────────────────
-  // Silencio en: gracia mañana/tarde, fin de semana (caídas masivas normales)
-  // Pero SIEMPRE mandamos email si hay ENTIDAD_NUEVA o ENTIDAD_REMOVIDA
+  // ── 7. Email según horario ──────────────────────────────────
+  // 06:00-06:29 gracia mañana → silencio total
+  // 06:30-17:59 operativo     → todo
+  // 18:00-18:29 gracia tarde  → silencio total
+  // 18:30-05:59 nocturno      → todo (igual que operativo)
   console.log('');
-  const silencio = esGracia() || fds;
-
-  // Caída masiva = más del 50% de entidades cambian de golpe → es fin de día o arranque
-  // No es un evento real — silencio
-  const totalAnterior = estadoAnterior
-    ? Object.keys(estadoAnterior).filter(k => k !== '_meta').length : 0;
-  const caida_masiva = (seCayeron.length + entidadesRemovidas.length) > (totalAnterior * 0.5);
-  const reconexion_masiva = seReconectaron.length > (totalAnterior * 0.5);
-  const esCambioMasivo = caida_masiva || reconexion_masiva;
-
-  // SIEMPRE alertar si es entidad nueva o removida individual (no masiva)
-  const esEstructural = (entidadesNuevas.length > 0)
-    || (entidadesRemovidas.length > 0 && entidadesRemovidas.length < 5);
-
   if (!estadoAnterior) {
     console.log('  Email: '+AM+'omitido (primera corrida)'+X);
   } else if (!hayCambios) {
     console.log('  Email: '+V+'omitido (sin cambios)'+X);
-  } else if (esCambioMasivo && !esEstructural) {
-    console.log('  Email: '+AM+'omitido (cambio masivo — transición operativa normal: fin/inicio de día)'+X);
-  } else if (silencio && !esEstructural) {
-    console.log('  Email: '+AM+'omitido ('+horarioActual.toLowerCase()+' — operación normal)'+X);
+  } else if (esGracia()) {
+    console.log('  Email: '+AM+'omitido (período de gracia — transición operativa normal)'+X);
   } else {
+    // Operativo 06:30-17:59 y Nocturno 18:30-05:59 → manda todo
     const { asunto, html, texto } = construirEmail(
       conn, disc, seCayeron, seReconectaron,
       entidadesNuevas, entidadesRemovidas,
@@ -488,15 +504,19 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
     await enviarEmail(asunto, html, texto);
   }
 
+  // ── 8. Guardar estado ───────────────────────────────────────
   guardarEstado(bancos);
 
+  // ── 9. CSV ──────────────────────────────────────────────────
   const rutaSnap = path.join(DIR, 'snapshot_inicial.txt');
   if (!fs.existsSync(rutaSnap)) {
     const lineas = [
       '================================================================',
       '  MONSPEI BANXICO — BASE DE DATOS INICIAL (REFERENCIA)',
-      '  Fecha      : '+FECHA, '  Capturado  : '+timestamp,
-      '  Total      : '+bancos.length, '  Conectados : '+conn.length,
+      '  Fecha      : '+FECHA,
+      '  Capturado  : '+timestamp,
+      '  Total      : '+bancos.length,
+      '  Conectados : '+conn.length,
       '  Desconect. : '+disc.length,
       '================================================================',
       '', '--- CONECTADOS ---',
@@ -506,6 +526,8 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
       '', '--- FIN BASE INICIAL ---',
     ];
     fs.writeFileSync(rutaSnap, lineas.join('\n'), 'utf8');
+    console.log('');
+    console.log('  '+V+'Snapshot inicial guardado (primera vez)'+X);
   }
 
   fs.writeFileSync(rutaAll, cab + bancos.map(b=>
@@ -523,7 +545,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
 
   if (hayCambios) {
     const rutaCambios = path.join(DIR, 'cambios.csv');
-    const esNuevo = !fs.existsSync(rutaCambios);
+    const esNuevoCambios = !fs.existsSync(rutaCambios);
     const filas = [
       ...seCayeron.map(b=>'"'+b.nombre+'","CAIDA","'+timestamp+'"'),
       ...seReconectaron.map(b=>'"'+b.nombre+'","RECONEXION","'+timestamp+'"'),
@@ -531,16 +553,17 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
       ...entidadesRemovidas.map(b=>'"'+b.nombre+'","ENTIDAD_REMOVIDA","'+timestamp+'"'),
     ];
     fs.appendFileSync(rutaCambios,
-      (esNuevo ? 'Banco,Evento,Tiempo\n' : '') + filas.join('\n')+'\n', 'utf8');
+      (esNuevoCambios ? 'Banco,Evento,Tiempo\n' : '') + filas.join('\n')+'\n', 'utf8');
   }
 
   console.log('');
   console.log('  Archivos en ./salidas/');
-  console.log('  '+V+B+'all.csv             '+X+'  — POKA-YOKE: '+bancos.length+' filas');
-  console.log('  '+V+B+'desconectados.csv   '+X+'  — POKA-YOKE: '+disc.length+' caída(s)');
-  console.log('  '+V+'historial.csv       '+X+'  — acumulado histórico');
-  console.log('  '+V+'cambios.csv         '+X+'  — eventos detectados');
-  console.log('  '+V+'estado_anterior.json'+X+'  — '+bancos.length+' entidades guardadas');
+  console.log('  '+V+'snapshot_inicial.txt'+X+'  — referencia (solo 1a vez)');
+  console.log('  '+V+B+'all.csv             '+X+'  — POKA-YOKE: '+bancos.length+' filas, estado actual');
+  console.log('  '+V+B+'desconectados.csv   '+X+'  — POKA-YOKE: '+disc.length+' entidad(es) roja(s) ahora');
+  console.log('  '+V+'historial.csv       '+X+'  — acumulado histórico completo');
+  console.log('  '+V+'cambios.csv         '+X+'  — CAIDA / RECONEXION / ENTIDAD_NUEVA / ENTIDAD_REMOVIDA');
+  console.log('  '+V+'estado_anterior.json'+X+'  — '+bancos.length+' entidades para próxima corrida');
   console.log('');
   process.exit(0);
 })();
