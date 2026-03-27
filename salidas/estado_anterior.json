@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "27/03/2026 02:09:32"
+    "timestamp": "27/03/2026 05:10:01"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -18,13 +18,13 @@
   "BANJERCITO": true,
   "BANK OF AMERICA": true,
   "BANK OF CHINA": false,
-  "BANKAOOL": false,
+  "BANKAOOL": true,
   "BANOBRAS": true,
   "BANORTE": true,
   "BANREGIO": true,
   "BANSI": true,
   "BANXICO": true,
-  "BARCLAYS": false,
+  "BARCLAYS": true,
   "BBASE": true,
   "BBVA MEXICO": true,
   "BMONEX": true,
@@ -90,7 +90,7 @@
   "Swap": true,
   "TESORED": true,
   "TRANSFER": true,
-  "TRANSFER DIRECT": false,
+  "TRANSFER DIRECT": true,
   "UALA": true,
   "UNAGRA": true,
   "VALMEX": false,
