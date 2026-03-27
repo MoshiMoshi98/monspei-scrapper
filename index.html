@@ -152,6 +152,14 @@
       main { padding: 16px; }
       td.ttime { display: none; }
     }
+    boff-night {
+    background: #FEF8EC;
+    color: #8a5a00;
+    border: 1px solid #f5d090;
+    }
+    .boff-night .bd {
+    background: #e67e22;
+    }
   </style>
 </head>
 <body>
@@ -200,104 +208,150 @@
 </footer>
 
 <script>
-  // ── CAMBIA ESTA URL por la de tu repo GitHub ──────────────────
-  const CSV_URL = 'https://raw.githubusercontent.com/MoshiMoshi98/monspei-scrapper/main/salidas/all.csv';
 
-  let datos = [];
-  let ultimaAct = null;
+const CSV_URL = 'https://raw.githubusercontent.com/MoshiMoshi98/monspei-scrapper/main/salidas/all.csv';
 
-  function parsearCSV(txt) {
-    return txt.trim().split('\n').slice(1).map(l => {
-      const c = l.match(/(".*?"|[^,]+)(?=,|$)/g);
-      if (!c || c.length < 4) return null;
-      return {
-        nombre:    c[0].replace(/"/g,'').trim(),
-        estatus:   c[1].trim() === 'true',
-        diferencia:c[2].trim(),
-        tiempo:    c[3].replace(/"/g,'').trim()
-      };
-    }).filter(Boolean);
+let datos = [];
+let ultimaAct = null;
+
+/* ───────── MODO NOCTURNO ───────── */
+function esNocturno() {
+  const now = new Date();
+  const mx = new Date(now.toLocaleString("en-US", { timeZone: "America/Mexico_City" }));
+  const h = mx.getHours();
+  const m = mx.getMinutes();
+
+  return (h >= 18) || (h < 6) || (h === 6 && m < 30);
+}
+
+/* ───────── CSV ───────── */
+function parsearCSV(txt) {
+  return txt.trim().split('\n').slice(1).map(l => {
+    const c = l.match(/(".*?"|[^,]+)(?=,|$)/g);
+    if (!c || c.length < 4) return null;
+    return {
+      nombre: c[0].replace(/"/g,'').trim(),
+      estatus: c[1].trim() === 'true',
+      diferencia: c[2].trim(),
+      tiempo: c[3].replace(/"/g,'').trim()
+    };
+  }).filter(Boolean);
+}
+
+/* ───────── MÉTRICAS ───────── */
+function renderMetricas(d) {
+  const conn = d.filter(x=>x.estatus).length;
+  const disc = d.filter(x=>!x.estatus).length;
+  const tot  = d.length;
+  const pct  = tot > 0 ? ((conn/tot)*100).toFixed(1) : 0;
+
+  document.getElementById('mConn').textContent  = conn;
+  document.getElementById('mDisc').textContent  = disc;
+  document.getElementById('mTotal').textContent = tot;
+  document.getElementById('mPct').textContent   = pct + '%';
+}
+
+/* ───────── ALERTAS ───────── */
+function renderAlertas(d) {
+  const disc = d.filter(x=>!x.estatus);
+  const noct = esNocturno();
+
+  const label = noct ? 'EN REPOSO' : 'CAÍDA';
+
+  const c = document.getElementById('alertsCont');
+  c.innerHTML = disc.map(x=>`
+    <div class="al r">
+      <span class="aname">● ${x.nombre}</span>
+      <span class="abadge">${label}</span>
+    </div>
+  `).join('');
+}
+
+/* ───────── TABLA ───────── */
+function renderTabla(d) {
+  const c = document.getElementById('tableCont');
+  if (!d.length) {
+    c.innerHTML = '<div class="err">Sin datos</div>';
+    return;
   }
 
-  function renderMetricas(d) {
-    const conn = d.filter(x=>x.estatus).length;
-    const disc = d.filter(x=>!x.estatus).length;
-    const tot  = d.length;
-    const pct  = tot > 0 ? ((conn/tot)*100).toFixed(1) : 0;
-    document.getElementById('mConn').textContent  = conn;
-    document.getElementById('mDisc').textContent  = disc;
-    document.getElementById('mTotal').textContent = tot;
-    document.getElementById('mPct').textContent   = pct + '%';
-    const mcA = document.querySelector('.mc.a');
-    const mvA = document.getElementById('mPct');
-    if (pct >= 99)      { mcA.style.borderTopColor='#27ae60'; mvA.style.color='#1a7a4a'; }
-    else if (pct >= 95) { mcA.style.borderTopColor='#e67e22'; mvA.style.color='#8a5a00'; }
-    else                { mcA.style.borderTopColor='#e74c3c'; mvA.style.color='#C0392B'; }
-  }
+  const noct = esNocturno();
 
-  function renderAlertas(d) {
-    const disc = d.filter(x=>!x.estatus);
-    const c = document.getElementById('alertsCont');
-    c.innerHTML = disc.map(x=>`
-      <div class="al r">
-        <span class="aname">● ${x.nombre}</span>
-        <span class="abadge">DESCONECTADA</span>
-      </div>`).join('');
-  }
-
-  function renderTabla(d) {
-    const c = document.getElementById('tableCont');
-    if (!d.length) { c.innerHTML='<div class="err">Sin datos</div>'; return; }
-    c.innerHTML = `<table>
-      <thead><tr><th>#</th><th>Entidad financiera</th><th>Estado</th><th>Última actividad</th><th>Captura</th></tr></thead>
-      <tbody>${d.map((x,i)=>`
+  c.innerHTML = `<table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Entidad financiera</th>
+        <th>Estado</th>
+        <th>Última actividad</th>
+        <th>Captura</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${d.map((x,i)=>`
         <tr data-n="${x.nombre.toLowerCase()}">
           <td class="num">${String(i+1).padStart(2,'0')}</td>
           <td style="font-weight:500">${x.nombre}</td>
-          <td><span class="badge ${x.estatus?'bon':'boff'}"><span class="bd"></span>${x.estatus?'CONECTADA':'CAÍDA'}</span></td>
+          <td>
+            <span class="badge ${
+              x.estatus ? 'bon' : (noct ? 'boff-night' : 'boff')
+            }">
+              <span class="bd"></span>
+              ${
+                x.estatus
+                  ? 'CONECTADA'
+                  : (noct ? 'EN REPOSO' : 'CAÍDA')
+              }
+            </span>
+          </td>
           <td class="ttime">${x.diferencia}</td>
           <td class="ttime">${x.tiempo}</td>
-        </tr>`).join('')}
-      </tbody></table>`;
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>`;
+}
+
+/* ───────── FILTRO ───────── */
+function filtrar(q) {
+  document.querySelectorAll('tbody tr').forEach(tr=>{
+    tr.style.display = tr.dataset.n.includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+
+/* ───────── CARGA ───────── */
+async function cargarDatos() {
+  document.getElementById('stxt').textContent = 'actualizando...';
+
+  try {
+    const r = await fetch(CSV_URL + '?t=' + Date.now());
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+
+    datos = parsearCSV(await r.text());
+
+    renderMetricas(datos);
+    renderAlertas(datos);
+    renderTabla(datos);
+
+    ultimaAct = new Date();
+
+    document.getElementById('lastUpd').textContent =
+      ultimaAct.toLocaleString('es-MX', { timeZone: 'America/Mexico_City' });
+
+    document.getElementById('stxt').textContent = 'en línea';
+
+  } catch(e) {
+    document.getElementById('stxt').textContent = 
+      'en línea · ' + new Date().toLocaleTimeString('es-MX');
   }
+}
 
-  function filtrar(q) {
-    document.querySelectorAll('tbody tr').forEach(tr=>{
-      tr.style.display = tr.dataset.n.includes(q.toLowerCase()) ? '' : 'none';
-    });
-  }
+/* ───────── AUTO REFRESH ───────── */
+cargarDatos();
+const next = new Date(Date.now() + 1800000);
+document.getElementById('nextUpd').textContent =
+  'Siguiente: ' + next.toLocaleTimeString('es-MX');
 
-  async function cargarDatos() {
-    document.getElementById('stxt').textContent = 'actualizando...';
-    try {
-      const r = await fetch(CSV_URL + '?t=' + Date.now());
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      datos = parsearCSV(await r.text());
-      renderMetricas(datos);
-      renderAlertas(datos);
-      renderTabla(datos);
-      ultimaAct = new Date();
-      document.getElementById('lastUpd').textContent =
-        ultimaAct.toLocaleString('es-MX', { timeZone: 'America/Mexico_City' });
-      document.getElementById('stxt').textContent = 'en línea';
-      document.querySelector('.dot').style.background = '#27ae60';
-    } catch(e) {
-      document.getElementById('tableCont').innerHTML =
-        '<div class="err">No se pudo cargar — ' + e.message + '</div>';
-      document.getElementById('stxt').textContent = 'error';
-      document.querySelector('.dot').style.background = '#e74c3c';
-    }
-  }
-
-  setInterval(()=>{
-    if (!ultimaAct) return;
-    const diff = Math.max(0, Math.floor((ultimaAct.getTime() + 1800000 - Date.now()) / 1000));
-    document.getElementById('nextUpd').textContent =
-      `Próxima en ${Math.floor(diff/60)}:${String(diff%60).padStart(2,'0')}`;
-  }, 1000);
-
-  cargarDatos();
-  setInterval(cargarDatos, 1800000);
 </script>
 </body>
 </html>
