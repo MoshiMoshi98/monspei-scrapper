@@ -150,10 +150,21 @@ const enviarEmail = async (asunto, html, texto) => {
 
 // ─── CONSTRUIR EMAIL HTML ─────────────────────────────────────
 const construirEmail = (conn, disc, seCayeron, seReconectaron,
-                        entidadesNuevas, entidadesRemovidas, total, timestamp) => {
+                        entidadesNuevas, entidadesRemovidas, total, timestamp, nocturno=false) => {
 
   const pct      = ((conn.length / total) * 100).toFixed(1);
   const colorPct = conn.length === total ? '#27ae60' : conn.length >= total * 0.9 ? '#f39c12' : '#e74c3c';
+
+  // Terminología según horario
+  const labelCaida   = nocturno ? 'EN REPOSO'   : 'CAÍDA';
+  const labelSeccion = nocturno ? 'En reposo'   : 'Se cayeron';
+  const colorCaida   = nocturno ? '#e67e22'     : '#e74c3c';
+  const bgCaida      = nocturno ? '#fefaf4'     : '#fdf4f4';
+  const bdCaida      = nocturno ? '#f5e0b0'     : '#f5c6c6';
+  const txtCaida     = nocturno ? '#7a4a10'     : '#7a2020';
+  const badgeColor   = nocturno ? '#a05010'     : '#c0392b';
+  const badgeBg      = nocturno ? '#fef0d8'     : '#fce8e8';
+  const badgeBd      = nocturno ? '#f5d090'     : '#f5c6c6';
 
   let asunto = '';
   if (entidadesNuevas.length > 0)
@@ -161,9 +172,13 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   else if (entidadesRemovidas.length > 0)
     asunto = `[MONSPEI] Entidad financiera removida del SPEI — ${timestamp}`;
   else if (seCayeron.length > 0 && seReconectaron.length > 0)
-    asunto = `[MONSPEI] Cambios detectados: ${seCayeron.length} caída(s), ${seReconectaron.length} reconexión(es) — ${timestamp}`;
+    asunto = nocturno
+      ? `[MONSPEI] ${seCayeron.length} entidad(es) en reposo, ${seReconectaron.length} reconexión(es) — ${timestamp}`
+      : `[MONSPEI] Cambios detectados: ${seCayeron.length} caída(s), ${seReconectaron.length} reconexión(es) — ${timestamp}`;
   else if (seCayeron.length > 0)
-    asunto = `[MONSPEI] ${seCayeron.length} entidad(es) financiera(s) caída(s) — ${timestamp}`;
+    asunto = nocturno
+      ? `[MONSPEI] ${seCayeron.length} entidad(es) en reposo operativo — ${timestamp}`
+      : `[MONSPEI] ${seCayeron.length} entidad(es) financiera(s) caída(s) — ${timestamp}`;
   else if (seReconectaron.length > 0)
     asunto = `[MONSPEI] ${seReconectaron.length} entidad(es) financiera(s) reconectada(s) — ${timestamp}`;
 
@@ -197,15 +212,15 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
 
   if (seCayeron.length > 0) {
     const filas = seCayeron.map(b =>
-      `<div style="border:1px solid #f5c6c6;border-left:3px solid #e74c3c;border-radius:0 4px 4px 0;background:#fdf4f4;padding:11px 16px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">
+      `<div style="border:1px solid ${bdCaida};border-left:3px solid ${colorCaida};border-radius:0 4px 4px 0;background:${bgCaida};padding:11px 16px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <div style="width:6px;height:6px;border-radius:50%;background:#e74c3c;"></div>
-          <span style="font-size:13px;color:#7a2020;font-weight:500;">${b.nombre}</span>
+          <div style="width:6px;height:6px;border-radius:50%;background:${colorCaida};"></div>
+          <span style="font-size:13px;color:${txtCaida};font-weight:500;">${b.nombre}</span>
         </div>
-        <span style="font-size:10px;color:#c0392b;background:#fce8e8;border:1px solid #f5c6c6;padding:2px 8px;border-radius:3px;letter-spacing:0.5px;font-weight:500;">CAÍDA</span>
+        <span style="font-size:10px;color:${badgeColor};background:${badgeBg};border:1px solid ${badgeBd};padding:2px 8px;border-radius:3px;letter-spacing:0.5px;font-weight:500;">${labelCaida}</span>
       </div>`
     ).join('');
-    seccionCambios += `<p style="margin:0 0 8px;font-size:10px;font-weight:600;letter-spacing:1.2px;color:#c0392b;text-transform:uppercase;">Se cayeron (${seCayeron.length})</p>${filas}`;
+    seccionCambios += `<p style="margin:0 0 8px;font-size:10px;font-weight:600;letter-spacing:1.2px;color:${colorCaida};text-transform:uppercase;">${labelSeccion} (${seCayeron.length})</p>${filas}`;
   }
 
   if (seReconectaron.length > 0) {
@@ -484,10 +499,13 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
 
   // ── 7. Email según horario ──────────────────────────────────
   // 06:00-06:29 gracia mañana → silencio total
-  // 06:30-17:59 operativo     → todo
-  // 18:00-18:29 gracia tarde  → silencio total
-  // 18:30-05:59 nocturno      → todo (igual que operativo)
+  // 06:30-17:59 operativo     → todo (caídas, reconexiones, estructurales)
+  // 18:00-06:29 nocturno      → solo reconexiones + ENTIDAD_NUEVA/REMOVIDA
+  //                             las "caídas" nocturnas son EN REPOSO normal
   console.log('');
+
+  const esNocturno = !esOperativoPleno() && !esGracia();
+
   if (!estadoAnterior) {
     console.log('  Email: '+AM+'omitido (primera corrida)'+X);
   } else if (!hayCambios) {
@@ -495,11 +513,10 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   } else if (esGracia()) {
     console.log('  Email: '+AM+'omitido (período de gracia — transición operativa normal)'+X);
   } else {
-    // Operativo 06:30-17:59 y Nocturno 18:30-05:59 → manda todo
     const { asunto, html, texto } = construirEmail(
       conn, disc, seCayeron, seReconectaron,
       entidadesNuevas, entidadesRemovidas,
-      bancos.length, timestamp
+      bancos.length, timestamp, esNocturno
     );
     await enviarEmail(asunto, html, texto);
   }
