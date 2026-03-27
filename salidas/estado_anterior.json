@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "26/03/2026 23:52:47"
+    "timestamp": "27/03/2026 02:09:32"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -18,7 +18,7 @@
   "BANJERCITO": true,
   "BANK OF AMERICA": true,
   "BANK OF CHINA": false,
-  "BANKAOOL": true,
+  "BANKAOOL": false,
   "BANOBRAS": true,
   "BANORTE": true,
   "BANREGIO": true,
@@ -92,9 +92,9 @@
   "TRANSFER": true,
   "TRANSFER DIRECT": false,
   "UALA": true,
-  "UNAGRA": false,
+  "UNAGRA": true,
   "VALMEX": false,
-  "VALUE": false,
+  "VALUE": true,
   "VE POR MAS": true,
   "VOLKSWAGEN": true,
   "albo": true
