@@ -24,9 +24,9 @@ const MARGEN   = 5 * 60 * 1000;
 
 // ─── HORARIO OPERATIVO SPEI ────────────────────────────────────
 // 06:00-06:29 → Gracia mañana   — reconexiones normales, sin emails
-// 06:30-17:59 → Operativo pleno — emails para todo
+// 06:30-17:59 → Operativo pleno — emails para todo (FALLA OPERATIVA)
 // 18:00-18:29 → Gracia tarde    — caídas normales, sin emails
-// 18:30-05:59 → Overnight       — solo emails si hay ENTIDAD_NUEVA/REMOVIDA
+// 18:30-05:59 → Nocturno        — solo emails si hay ENTIDAD_NUEVA/REMOVIDA
 
 const esOperativoPleno = () => {
   const hora = dayjs().tz(ZONA).hour();
@@ -148,6 +148,71 @@ const enviarEmail = async (asunto, html, texto) => {
   }
 };
 
+// ─── GENERADOR DE MENSAJE EJECUTIVO (Con Diccionario) ─────────
+const generarMensajeEjecutivo = ({ tipo, nombres, total, nocturno }) => {
+  const base = {
+    CAIDA: () => nocturno ? {
+      evento: 'Entidad en reposo / Fin de operaciones',
+      tipoOperativo: 'Inactividad programada',
+      descripcion: nombres.length === 1
+        ? `El participante ${nombres[0]} se encuentra en estatus inactivo, coincidiendo con el horario de baja transaccional.`
+        : `Múltiples participantes pasaron a estatus inactivo por horario nocturno.`,
+      impacto: 'Comportamiento esperado en horario no operativo.',
+      accion: 'Se registra para control; no requiere acción inmediata.'
+    } : {
+      evento: 'Incidente de disponibilidad',
+      tipoOperativo: 'Falla operativa',
+      descripcion: nombres.length === 1
+        ? `Se identificó una pérdida de conectividad (estatus false) del participante ${nombres[0]} dentro del SPEI.`
+        : `Se detectaron múltiples incidentes de disponibilidad (estatus false) en participantes del SPEI.`,
+      impacto: nombres.length === 1
+        ? `El participante se encuentra temporalmente fuera de operación.`
+        : `Algunos participantes presentan indisponibilidad dentro del sistema.`,
+      accion: 'Se mantiene monitoreo continuo y validación con las instituciones correspondientes.'
+    },
+
+    RECONEXION: () => ({
+      evento: 'Restablecimiento operativo',
+      tipoOperativo: 'Normalización',
+      descripcion: nombres.length === 1
+        ? `El participante ${nombres[0]} ha recuperado su conectividad (vuelve true) dentro del SPEI.`
+        : `Se ha restablecido la conectividad de múltiples participantes.`,
+      impacto: 'Operación normal restablecida.',
+      accion: 'Se continúa monitoreo para validar estabilidad de la normalización.'
+    }),
+
+    NUEVA: () => ({
+      evento: 'Incorporación de participante',
+      tipoOperativo: 'Cambio estructural',
+      descripcion: nombres.length === 1
+        ? `Se registró un nuevo participante en el SPEI: ${nombres[0]}.`
+        : `Se incorporaron nuevos participantes al SPEI.`,
+      impacto: `El universo total de participantes asciende a ${total}.`,
+      accion: 'Se actualiza el monitoreo conforme a la nueva configuración del sistema.'
+    }),
+
+    REMOVIDA: () => ({
+      evento: 'Desincorporación',
+      tipoOperativo: 'Riesgo / baja',
+      descripcion: nombres.length === 1
+        ? `El participante ${nombres[0]} ha desaparecido de la red SPEI (delete entidad / desaparece real).`
+        : `Se detectó la desincorporación múltiple de participantes del SPEI.`,
+      impacto: 'Cambio de riesgo en la estructura operativa del sistema.',
+      accion: 'Se ajusta el monitoreo y se levanta alerta por baja estructural.'
+    }),
+
+    MIXTO: () => ({
+      evento: 'Múltiples eventos detectados',
+      tipoOperativo: nocturno ? 'Transición operativa' : 'Fluctuación operativa',
+      descripcion: `Se detectaron eventos simultáneos de desconexión y restablecimiento en participantes del SPEI.`,
+      impacto: 'Variaciones en el estatus de las entidades.',
+      accion: 'Se mantiene monitoreo.'
+    })
+  };
+
+  return base[tipo] ? base[tipo]() : null;
+};
+
 // ─── CONSTRUIR EMAIL HTML ─────────────────────────────────────
 const construirEmail = (conn, disc, seCayeron, seReconectaron,
                         entidadesNuevas, entidadesRemovidas, total, timestamp, nocturno=false) => {
@@ -155,9 +220,9 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   const pct      = ((conn.length / total) * 100).toFixed(1);
   const colorPct = conn.length === total ? '#27ae60' : conn.length >= total * 0.9 ? '#f39c12' : '#e74c3c';
 
-  // Terminología según horario
-  const labelCaida   = nocturno ? 'EN REPOSO'   : 'CAÍDA';
-  const labelSeccion = nocturno ? 'En reposo'   : 'Se cayeron';
+  // Terminología según horario nocturno para la tabla visual
+  const labelCaida   = nocturno ? 'EN REPOSO'   : 'FALLA OPERATIVA';
+  const labelSeccion = nocturno ? 'En reposo'   : 'Incidente de disponibilidad';
   const colorCaida   = nocturno ? '#e67e22'     : '#e74c3c';
   const bgCaida      = nocturno ? '#fefaf4'     : '#fdf4f4';
   const bdCaida      = nocturno ? '#f5e0b0'     : '#f5c6c6';
@@ -166,21 +231,61 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   const badgeBg      = nocturno ? '#fef0d8'     : '#fce8e8';
   const badgeBd      = nocturno ? '#f5d090'     : '#f5c6c6';
 
+  // ─── DETERMINAR TIPO DE EVENTO Y ASUNTO ────────────────────
+  let tipoEvento = null;
   let asunto = '';
-  if (entidadesNuevas.length > 0)
-    asunto = `[MONSPEI] Nueva entidad financiera en SPEI — Total: ${total} — ${timestamp}`;
-  else if (entidadesRemovidas.length > 0)
-    asunto = `[MONSPEI] Entidad financiera removida del SPEI — ${timestamp}`;
-  else if (seCayeron.length > 0 && seReconectaron.length > 0)
+
+  if (entidadesNuevas.length > 0) {
+    tipoEvento = 'NUEVA';
+    asunto = `[MONSPEI][CAMBIO ESTRUCTURAL] Nueva entidad financiera en SPEI — Total: ${total} — ${timestamp}`;
+  } else if (entidadesRemovidas.length > 0) {
+    tipoEvento = 'REMOVIDA';
+    asunto = `[MONSPEI][RIESGO/BAJA] Entidad financiera removida del SPEI — ${timestamp}`;
+  } else if (seCayeron.length > 0 && seReconectaron.length > 0) {
+    tipoEvento = 'MIXTO';
     asunto = nocturno
-      ? `[MONSPEI] ${seCayeron.length} entidad(es) en reposo, ${seReconectaron.length} reconexión(es) — ${timestamp}`
-      : `[MONSPEI] Cambios detectados: ${seCayeron.length} caída(s), ${seReconectaron.length} reconexión(es) — ${timestamp}`;
-  else if (seCayeron.length > 0)
+      ? `[MONSPEI][INFO] ${seCayeron.length} entidad(es) en reposo, ${seReconectaron.length} reconexión(es) — ${timestamp}`
+      : `[MONSPEI][ALERTA] Fluctuación: ${seCayeron.length} incidente(s), ${seReconectaron.length} normalización(es) — ${timestamp}`;
+  } else if (seCayeron.length > 0) {
+    tipoEvento = 'CAIDA';
     asunto = nocturno
-      ? `[MONSPEI] ${seCayeron.length} entidad(es) en reposo operativo — ${timestamp}`
-      : `[MONSPEI] ${seCayeron.length} entidad(es) financiera(s) caída(s) — ${timestamp}`;
-  else if (seReconectaron.length > 0)
-    asunto = `[MONSPEI] ${seReconectaron.length} entidad(es) financiera(s) reconectada(s) — ${timestamp}`;
+      ? `[MONSPEI][INFO] ${seCayeron.length} entidad(es) en reposo operativo — ${timestamp}`
+      : `[MONSPEI][FALLA OPERATIVA] Incidente de disponibilidad: ${seCayeron.length} caída(s) — ${timestamp}`;
+  } else if (seReconectaron.length > 0) {
+    tipoEvento = 'RECONEXION';
+    asunto = `[MONSPEI][NORMALIZACIÓN] ${seReconectaron.length} restablecimiento(s) operativo(s) — ${timestamp}`;
+  }
+
+  // ─── GENERAR DATA DEL MENSAJE EJECUTIVO ────────────────────
+  const nombresEvento =
+    entidadesNuevas.length > 0 ? entidadesNuevas.map(b=>b.nombre) :
+    entidadesRemovidas.length > 0 ? entidadesRemovidas.map(b=>b.nombre) :
+    seCayeron.length > 0 ? seCayeron.map(b=>b.nombre) :
+    seReconectaron.length > 0 ? seReconectaron.map(b=>b.nombre) : [];
+
+  const mensaje = generarMensajeEjecutivo({ tipo: tipoEvento, nombres: nombresEvento, total, nocturno });
+
+  const bloqueEjecutivo = mensaje ? `
+    <tr>
+      <td style="padding:22px 32px;background:#ffffff;border-bottom:1px solid #D0DAE8;">
+        <p style="margin:0 0 6px;font-size:10px;font-weight:600;letter-spacing:1px;color:#7A8CA3;text-transform:uppercase;">
+          Resumen Ejecutivo
+        </p>
+        <h2 style="margin:0 0 10px;font-size:17px;color:#1a3a5c;">
+          ${mensaje.evento}
+        </h2>
+        <p style="margin:0 0 12px;font-size:13px;color:#4a5a6c;">
+          <b style="color:#2E75B6;">Tipo de Evento:</b> 
+          <span style="background:#edf2f7;padding:3px 8px;border-radius:4px;font-weight:600;color:#1a3a5c;border:1px solid #D0DAE8;">
+            ${mensaje.tipoOperativo}
+          </span>
+        </p>
+        <p style="margin:0 0 8px;font-size:13px;color:#4a5a6c;"><b>Descripción:</b> ${mensaje.descripcion}</p>
+        <p style="margin:0 0 8px;font-size:13px;color:#4a5a6c;"><b>Impacto:</b> ${mensaje.impacto}</p>
+        <p style="margin:0;font-size:13px;color:#4a5a6c;"><b>Acción:</b> ${mensaje.accion}</p>
+      </td>
+    </tr>
+  ` : '';
 
   let seccionCambios = '';
 
@@ -191,10 +296,10 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
           <div style="width:6px;height:6px;border-radius:50%;background:#e67e22;"></div>
           <span style="font-size:13px;color:#7a4a10;font-weight:500;">${b.nombre}</span>
         </div>
-        <span style="font-size:10px;color:#a05010;background:#fef0d8;border:1px solid #f5d090;padding:2px 8px;border-radius:3px;letter-spacing:0.5px;font-weight:500;">${b.estatus ? 'ACTIVA' : 'INACTIVA'}</span>
+        <span style="font-size:10px;color:#a05010;background:#fef0d8;border:1px solid #f5d090;padding:2px 8px;border-radius:3px;letter-spacing:0.5px;font-weight:500;">CAMBIO ESTRUCTURAL</span>
       </div>`
     ).join('');
-    seccionCambios += `<p style="margin:0 0 8px;font-size:10px;font-weight:600;letter-spacing:1.2px;color:#c07020;text-transform:uppercase;">Nueva(s) entidad(es) en SPEI</p>${filas}`;
+    seccionCambios += `<p style="margin:0 0 8px;font-size:10px;font-weight:600;letter-spacing:1.2px;color:#c07020;text-transform:uppercase;">Incorporación de participante(s)</p>${filas}`;
   }
 
   if (entidadesRemovidas.length > 0) {
@@ -204,10 +309,10 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
           <div style="width:6px;height:6px;border-radius:50%;background:#e74c3c;"></div>
           <span style="font-size:13px;color:#7a2020;font-weight:500;">${b.nombre}</span>
         </div>
-        <span style="font-size:10px;color:#c0392b;background:#fce8e8;border:1px solid #f5c6c6;padding:2px 8px;border-radius:3px;letter-spacing:0.5px;font-weight:500;">REMOVIDA</span>
+        <span style="font-size:10px;color:#c0392b;background:#fce8e8;border:1px solid #f5c6c6;padding:2px 8px;border-radius:3px;letter-spacing:0.5px;font-weight:500;">RIESGO / BAJA</span>
       </div>`
     ).join('');
-    seccionCambios += `<p style="margin:0 0 8px;font-size:10px;font-weight:600;letter-spacing:1.2px;color:#c0392b;text-transform:uppercase;">Entidad(es) removida(s) del SPEI</p>${filas}`;
+    seccionCambios += `<p style="margin:0 0 8px;font-size:10px;font-weight:600;letter-spacing:1.2px;color:#c0392b;text-transform:uppercase;">Desincorporación de entidad(es)</p>${filas}`;
   }
 
   if (seCayeron.length > 0) {
@@ -230,10 +335,10 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
           <div style="width:6px;height:6px;border-radius:50%;background:#27ae60;"></div>
           <span style="font-size:13px;color:#1a5a30;font-weight:500;">${b.nombre}</span>
         </div>
-        <span style="font-size:10px;color:#1a7a40;background:#e8faf0;border:1px solid #c6e4d4;padding:2px 8px;border-radius:3px;letter-spacing:0.5px;font-weight:500;">RECONEXIÓN</span>
+        <span style="font-size:10px;color:#1a7a40;background:#e8faf0;border:1px solid #c6e4d4;padding:2px 8px;border-radius:3px;letter-spacing:0.5px;font-weight:500;">NORMALIZACIÓN</span>
       </div>`
     ).join('');
-    seccionCambios += `<p style="margin:0 0 8px;font-size:10px;font-weight:600;letter-spacing:1.2px;color:#1a7a40;text-transform:uppercase;">Se reconectaron (${seReconectaron.length})</p>${filas}`;
+    seccionCambios += `<p style="margin:0 0 8px;font-size:10px;font-weight:600;letter-spacing:1.2px;color:#1a7a40;text-transform:uppercase;">Restablecimiento operativo (${seReconectaron.length})</p>${filas}`;
   }
 
   let seccionDisc = '';
@@ -301,15 +406,16 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
             </table>
           </td>
         </tr>
-        ${(seccionCambios || seccionDisc) ? `<tr><td style="padding:20px 32px 24px;"><p style="margin:0 0 14px;font-size:10px;font-weight:600;letter-spacing:1.5px;color:#7A8CA3;text-transform:uppercase;">Cambios detectados</p>${seccionCambios}${seccionDisc}</td></tr>` : ''}
+        ${bloqueEjecutivo}
+        ${(seccionCambios || seccionDisc) ? `<tr><td style="padding:20px 32px 24px;"><p style="margin:0 0 14px;font-size:10px;font-weight:600;letter-spacing:1.5px;color:#7A8CA3;text-transform:uppercase;">Eventos Detectados</p>${seccionCambios}${seccionDisc}</td></tr>` : ''}
         <tr>
           <td style="background:#F7FAFD;border-top:1px solid #D0DAE8;padding:14px 32px;">
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td>
                   <p style="margin:0;font-size:10px;color:#9AACBF;line-height:1.7;">
-                    <span style="color:#5a7a9a;font-weight:600;">MONSPEI v5</span> &nbsp;&middot;&nbsp; Banco de M&eacute;xico<br>
-                    Monitoreo autom&aacute;tico &middot; Actualizaci&oacute;n cada 30 minutos
+                    <span style="color:#5a7a9a;font-weight:600;">MONSPEI v5 (GitHub Actions)</span> &nbsp;&middot;&nbsp; Banco de M&eacute;xico<br>
+                    Monitoreo autom&aacute;tico &middot; Diccionario de Eventos Operativos
                   </p>
                 </td>
                 <td align="right" style="vertical-align:middle;">
@@ -327,7 +433,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
 </html>`;
 
   const texto = [
-    'MONSPEI — Monitor SPEI Banxico',
+    'MONSPEI — Monitor SPEI Banxico (GitHub Actions)',
     timestamp,
     '',
     'Conectados   : ' + conn.length,
@@ -335,9 +441,9 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
     'Disponibilidad: ' + pct + '%',
     'Total SPEI   : ' + total + ' entidades',
     '',
-    seCayeron.length > 0      ? 'SE CAYERON:\n' + seCayeron.map(b=>'  x '+b.nombre).join('\n') : '',
-    seReconectaron.length > 0 ? 'SE RECONECTARON:\n' + seReconectaron.map(b=>'  + '+b.nombre).join('\n') : '',
-    entidadesNuevas.length > 0? 'ENTIDADES NUEVAS:\n' + entidadesNuevas.map(b=>'  * '+b.nombre).join('\n') : '',
+    seCayeron.length > 0      ? (nocturno ? 'EN REPOSO:\n' : 'FALLA OPERATIVA:\n') + seCayeron.map(b=>'  x '+b.nombre).join('\n') : '',
+    seReconectaron.length > 0 ? 'NORMALIZACIÓN:\n' + seReconectaron.map(b=>'  + '+b.nombre).join('\n') : '',
+    entidadesNuevas.length > 0? 'CAMBIO ESTRUCTURAL (ALTA):\n' + entidadesNuevas.map(b=>'  * '+b.nombre).join('\n') : '',
     disc.length > 0           ? 'TOTAL DESCONECTADOS:\n' + disc.map(b=>'  x '+b.nombre).join('\n') : '',
   ].filter(Boolean).join('\n');
 
@@ -367,11 +473,13 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   const FECHA     = hoy.getFullYear()+'/'
                   + String(hoy.getMonth()+1).padStart(2,'0')+'/'
                   + String(hoy.getDate()).padStart(2,'0');
+  
   const horarioActual = esGracia() ? 'GRACIA' : esOperativoPleno() ? 'OPERATIVO' : 'NOCTURNO';
+  const esNocturno = !esOperativoPleno() && !esGracia();
 
   console.log('');
   console.log(B+'  ╔══════════════════════════════════════════════════════╗'+X);
-  console.log(B+'  ║   MONSPEI — Scraper  [Poka-Yoke v5]                  ║'+X);
+  console.log(B+'  ║   MONSPEI — Scraper  [GitHub Actions - Diccionario]  ║'+X);
   console.log(B+'  ╚══════════════════════════════════════════════════════╝'+X);
   console.log('  Fecha    : ' + FECHA);
   console.log('  Capturado: ' + timestamp);
@@ -388,7 +496,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
       + ' — ' + totalAntes + ' entidades'
       + ' (' + (estadoAnterior._meta ? estadoAnterior._meta.timestamp : 'sin fecha') + ')');
   } else {
-    console.log('  Estado anterior : ' + AM+'no existe (primera corrida)'+X);
+    console.log('  Estado anterior : ' + AM+'no existe (primera corrida - Inicio Monitoreo)'+X);
   }
   console.log('');
 
@@ -442,7 +550,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
     const estado  = b.estatus ? V+'[true ] '+X : R+'[false] '+X;
     const nom     = esNueva ? AM+B+b.nombre.padEnd(22)+X : b.nombre.padEnd(22);
     const extra   = b.numPeriodos > 1 ? ' ('+b.numPeriodos+'p)' : '';
-    const tag     = esNueva ? AM+' ← NUEVA'+X : '';
+    const tag     = esNueva ? AM+' ← CAMBIO ESTRUCTURAL'+X : '';
     console.log('  '+num+'. '+estado+' '+nom+' '+b.inicio+'  '+b.fin+extra+tag);
   });
 
@@ -454,7 +562,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
 
   if (disc.length > 0) {
     console.log('');
-    console.log('  '+R+B+'DESCONECTADOS:'+X);
+    console.log('  '+R+B+'DESCONECTADOS (Fallas operativas / Reposo):'+X);
     disc.forEach(b => {
       console.log('  '+R+'  x '+b.nombre+X);
       console.log('      Inicio: '+b.inicio+'  Fin: '+b.fin);
@@ -463,7 +571,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
 
   // ── 6. Cambios terminal ─────────────────────────────────────
   console.log('');
-  console.log('  '+B+'─── CAMBIOS DETECTADOS '+'─'.repeat(46)+X);
+  console.log('  '+B+'─── EVENTOS OPERATIVOS DETECTADOS '+'─'.repeat(46)+X);
   if (!estadoAnterior) {
     console.log('  '+AM+'  Primera corrida — sin estado anterior para comparar'+X);
   } else if (!hayCambios) {
@@ -471,7 +579,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   } else {
     if (entidadesNuevas.length > 0) {
       console.log('');
-      console.log('  '+AM+B+'  NUEVA(S) ENTIDAD(ES) EN SPEI ('+entidadesNuevas.length+'):'+X);
+      console.log('  '+AM+B+'  INCORPORACIÓN DE PARTICIPANTE [Tipo: Cambio estructural] ('+entidadesNuevas.length+'):'+X);
       entidadesNuevas.forEach(b => {
         const est = b.estatus ? V+'[activa]'+X : R+'[inactiva]'+X;
         console.log('  '+AM+'  * '+b.nombre+X+' '+est);
@@ -481,17 +589,18 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
     }
     if (entidadesRemovidas.length > 0) {
       console.log('');
-      console.log('  '+R+B+'  ENTIDAD(ES) REMOVIDA(S) ('+entidadesRemovidas.length+'):'+X);
+      console.log('  '+R+B+'  DESINCORPORACIÓN / ENTIDAD DESAPARECE [Tipo: Riesgo / baja] ('+entidadesRemovidas.length+'):'+X);
       entidadesRemovidas.forEach(b => console.log('  '+R+'  - '+b.nombre+X));
     }
     if (seCayeron.length > 0) {
       console.log('');
-      console.log('  '+R+B+'  SE CAYERON ('+seCayeron.length+'):'+X);
+      const tagCaida = esNocturno ? 'EN REPOSO [Tipo: Inactividad programada]' : 'INCIDENTE DE DISPONIBILIDAD [Tipo: Falla operativa]';
+      console.log('  '+R+B+`  ${tagCaida} (`+seCayeron.length+'):'+X);
       seCayeron.forEach(b => console.log('  '+R+'  x '+b.nombre+X));
     }
     if (seReconectaron.length > 0) {
       console.log('');
-      console.log('  '+V+B+'  SE RECONECTARON ('+seReconectaron.length+'):'+X);
+      console.log('  '+V+B+'  RESTABLECIMIENTO OPERATIVO [Tipo: Normalización] ('+seReconectaron.length+'):'+X);
       seReconectaron.forEach(b => console.log('  '+V+'  + '+b.nombre+X));
     }
   }
@@ -504,14 +613,15 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   //                             las "caídas" nocturnas son EN REPOSO normal
   console.log('');
 
-  const esNocturno = !esOperativoPleno() && !esGracia();
-
   if (!estadoAnterior) {
     console.log('  Email: '+AM+'omitido (primera corrida)'+X);
   } else if (!hayCambios) {
     console.log('  Email: '+V+'omitido (sin cambios)'+X);
   } else if (esGracia()) {
     console.log('  Email: '+AM+'omitido (período de gracia — transición operativa normal)'+X);
+  } else if (esNocturno && seCayeron.length > 0 && entidadesNuevas.length === 0 && entidadesRemovidas.length === 0 && seReconectaron.length === 0) {
+    // Si es de noche y SOLO hay caídas, omitimos el email porque es inactividad programada normal
+    console.log('  Email: '+AM+'omitido (horario nocturno — inactividad programada)'+X);
   } else {
     const { asunto, html, texto } = construirEmail(
       conn, disc, seCayeron, seReconectaron,
@@ -563,23 +673,26 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   if (hayCambios) {
     const rutaCambios = path.join(DIR, 'cambios.csv');
     const esNuevoCambios = !fs.existsSync(rutaCambios);
+    // Cambiamos "CAIDA" por "FALLA_OPERATIVA" / "REPOSO_NOCTURNO" para que el dashboard en Netlify lo lea mejor
+    const tagFalla = esNocturno ? "REPOSO_NOCTURNO" : "FALLA_OPERATIVA";
+    
     const filas = [
-      ...seCayeron.map(b=>'"'+b.nombre+'","CAIDA","'+timestamp+'"'),
-      ...seReconectaron.map(b=>'"'+b.nombre+'","RECONEXION","'+timestamp+'"'),
-      ...entidadesNuevas.map(b=>'"'+b.nombre+'","ENTIDAD_NUEVA","'+timestamp+'"'),
-      ...entidadesRemovidas.map(b=>'"'+b.nombre+'","ENTIDAD_REMOVIDA","'+timestamp+'"'),
+      ...seCayeron.map(b=>'"'+b.nombre+'","'+tagFalla+'","'+timestamp+'"'),
+      ...seReconectaron.map(b=>'"'+b.nombre+'","NORMALIZACION","'+timestamp+'"'),
+      ...entidadesNuevas.map(b=>'"'+b.nombre+'","CAMBIO_ESTRUCTURAL","'+timestamp+'"'),
+      ...entidadesRemovidas.map(b=>'"'+b.nombre+'","RIESGO_BAJA","'+timestamp+'"'),
     ];
     fs.appendFileSync(rutaCambios,
-      (esNuevoCambios ? 'Banco,Evento,Tiempo\n' : '') + filas.join('\n')+'\n', 'utf8');
+      (esNuevoCambios ? 'Banco,Evento_Operativo,Tiempo\n' : '') + filas.join('\n')+'\n', 'utf8');
   }
 
   console.log('');
-  console.log('  Archivos en ./salidas/');
+  console.log('  Archivos en ./salidas/ listos para GitHub Actions Push:');
   console.log('  '+V+'snapshot_inicial.txt'+X+'  — referencia (solo 1a vez)');
   console.log('  '+V+B+'all.csv             '+X+'  — POKA-YOKE: '+bancos.length+' filas, estado actual');
   console.log('  '+V+B+'desconectados.csv   '+X+'  — POKA-YOKE: '+disc.length+' entidad(es) roja(s) ahora');
   console.log('  '+V+'historial.csv       '+X+'  — acumulado histórico completo');
-  console.log('  '+V+'cambios.csv         '+X+'  — CAIDA / RECONEXION / ENTIDAD_NUEVA / ENTIDAD_REMOVIDA');
+  console.log('  '+V+'cambios.csv         '+X+'  — Operativa: FALLA / NORMALIZACION / CAMBIO ESTRUCTURAL / BAJA');
   console.log('  '+V+'estado_anterior.json'+X+'  — '+bancos.length+' entidades para próxima corrida');
   console.log('');
   process.exit(0);
