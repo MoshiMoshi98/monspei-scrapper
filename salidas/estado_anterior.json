@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "09/04/2026 00:05:49"
+    "timestamp": "09/04/2026 04:41:58"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -33,7 +33,7 @@
   "CAJA TELEFONIST": true,
   "CASHI CUENTA": true,
   "CI BOLSA": true,
-  "CITI MEXICO": true,
+  "CITI MEXICO": false,
   "CLS": true,
   "COMPARTAMOS": true,
   "CONSUBANCO": true,
@@ -90,7 +90,7 @@
   "Swap": true,
   "TESORED": true,
   "TRANSFER": true,
-  "TRANSFER DIRECT": false,
+  "TRANSFER DIRECT": true,
   "UALA": true,
   "UNAGRA": true,
   "VALMEX": false,
