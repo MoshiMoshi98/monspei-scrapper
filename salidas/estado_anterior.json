@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "27/04/2026 03:36:34"
+    "timestamp": "27/04/2026 05:42:07"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -24,7 +24,7 @@
   "BANREGIO": true,
   "BANSI": true,
   "BANXICO": true,
-  "BARCLAYS": false,
+  "BARCLAYS": true,
   "BBASE": true,
   "BBVA MEXICO": true,
   "BMONEX": true,
@@ -76,7 +76,7 @@
   "MexPago": true,
   "NAFIN": false,
   "NU MEXICO": true,
-  "NVIO": true,
+  "NVIO": false,
   "PAGATODO": true,
   "PPBALANCEMX": true,
   "PROFUTURO": false,
@@ -90,7 +90,7 @@
   "Swap": true,
   "TESORED": true,
   "TRANSFER": true,
-  "TRANSFER DIRECT": false,
+  "TRANSFER DIRECT": true,
   "UALA": true,
   "UNAGRA": true,
   "VALMEX": false,
