@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "30/04/2026 12:52:32"
+    "timestamp": "30/04/2026 14:07:28"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -36,7 +36,7 @@
   "CITI MEXICO": true,
   "CLS": true,
   "COMPARTAMOS": true,
-  "CONSUBANCO": true,
+  "CONSUBANCO": false,
   "COOPDESARROLLO": true,
   "CREDICAPITAL": true,
   "CREDICLUB": true,
