@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "04/05/2026 20:49:27"
+    "timestamp": "04/05/2026 23:39:42"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -34,7 +34,7 @@
   "CASHI CUENTA": true,
   "CI BOLSA": true,
   "CITI MEXICO": true,
-  "CLS": false,
+  "CLS": true,
   "COMPARTAMOS": true,
   "CONSUBANCO": true,
   "COOPDESARROLLO": false,
