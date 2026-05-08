@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "08/05/2026 02:54:30"
+    "timestamp": "08/05/2026 04:21:45"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -16,7 +16,7 @@
   "BANCOPPEL": true,
   "BANCREA": true,
   "BANJERCITO": true,
-  "BANK OF AMERICA": false,
+  "BANK OF AMERICA": true,
   "BANK OF CHINA": false,
   "BANKAOOL": true,
   "BANOBRAS": true,
@@ -90,7 +90,7 @@
   "Swap": true,
   "TESORED": true,
   "TRANSFER": true,
-  "TRANSFER DIRECT": false,
+  "TRANSFER DIRECT": true,
   "UALA": true,
   "UNAGRA": true,
   "VALMEX": false,
