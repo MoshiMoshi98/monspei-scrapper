@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "12/05/2026 16:57:04"
+    "timestamp": "12/05/2026 17:59:52"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -10,7 +10,7 @@
   "AZTECA": true,
   "BAJIO": true,
   "BANAMEX": true,
-  "BANCO COVALTO": true,
+  "BANCO COVALTO": false,
   "BANCO S3": true,
   "BANCOMEXT": true,
   "BANCOPPEL": true,
@@ -34,7 +34,7 @@
   "CASHI CUENTA": true,
   "CI BOLSA": true,
   "CITI MEXICO": true,
-  "CLS": true,
+  "CLS": false,
   "COMPARTAMOS": true,
   "CONSUBANCO": true,
   "COOPDESARROLLO": true,
