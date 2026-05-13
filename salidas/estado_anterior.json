@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "13/05/2026 09:24:04"
+    "timestamp": "13/05/2026 11:32:58"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -84,7 +84,7 @@
   "SABADELL": true,
   "SANTANDER": true,
   "SCOTIABANK": true,
-  "SHINHAN": false,
+  "SHINHAN": true,
   "SPIN BY OXXO": true,
   "STP": true,
   "Swap": true,
