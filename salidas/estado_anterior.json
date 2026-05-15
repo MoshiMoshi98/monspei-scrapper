@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "15/05/2026 15:59:35"
+    "timestamp": "15/05/2026 17:03:51"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -96,6 +96,6 @@
   "VALMEX": true,
   "VALUE": true,
   "VE POR MAS": true,
-  "VOLKSWAGEN": true,
+  "VOLKSWAGEN": false,
   "albo": true
 }
