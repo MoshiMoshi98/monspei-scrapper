@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "20/05/2026 20:56:02"
+    "timestamp": "21/05/2026 00:52:51"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -34,8 +34,8 @@
   "CASHI CUENTA": true,
   "CI BOLSA": true,
   "CITI MEXICO": true,
-  "CLS": false,
-  "COMPARTAMOS": true,
+  "CLS": true,
+  "COMPARTAMOS": false,
   "CONSUBANCO": true,
   "COOPDESARROLLO": false,
   "CREDICAPITAL": true,
@@ -92,9 +92,9 @@
   "TRANSFER": true,
   "TRANSFER DIRECT": false,
   "UALA": true,
-  "UNAGRA": false,
+  "UNAGRA": true,
   "VALMEX": false,
-  "VALUE": false,
+  "VALUE": true,
   "VE POR MAS": true,
   "VOLKSWAGEN": true,
   "albo": true
