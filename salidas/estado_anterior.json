@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "21/05/2026 22:15:42"
+    "timestamp": "22/05/2026 01:57:35"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -77,7 +77,7 @@
   "NAFIN": false,
   "NU MEXICO": true,
   "NVIO": true,
-  "PAGATODO": true,
+  "PAGATODO": false,
   "PPBALANCEMX": false,
   "PROFUTURO": false,
   "Peibo": true,
@@ -92,7 +92,7 @@
   "TRANSFER": true,
   "TRANSFER DIRECT": false,
   "UALA": true,
-  "UNAGRA": false,
+  "UNAGRA": true,
   "VALMEX": false,
   "VALUE": true,
   "VE POR MAS": true,
