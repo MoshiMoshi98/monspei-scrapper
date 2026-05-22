@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "22/05/2026 01:57:35"
+    "timestamp": "22/05/2026 04:53:26"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -77,7 +77,7 @@
   "NAFIN": false,
   "NU MEXICO": true,
   "NVIO": true,
-  "PAGATODO": false,
+  "PAGATODO": true,
   "PPBALANCEMX": false,
   "PROFUTURO": false,
   "Peibo": true,
