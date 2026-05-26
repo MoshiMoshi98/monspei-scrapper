@@ -1,14 +1,14 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "25/05/2026 20:49:08"
+    "timestamp": "26/05/2026 00:42:52"
   },
   "ACTINVER": true,
   "AFIRME": true,
   "ARCUS FI": true,
   "ASP INTEGRA OPC": true,
   "AZTECA": true,
-  "BAJIO": true,
+  "BAJIO": false,
   "BANAMEX": true,
   "BANCO COVALTO": true,
   "BANCO S3": true,
@@ -34,7 +34,7 @@
   "CASHI CUENTA": true,
   "CI BOLSA": true,
   "CITI MEXICO": true,
-  "CLS": false,
+  "CLS": true,
   "COMPARTAMOS": true,
   "CONSUBANCO": true,
   "COOPDESARROLLO": false,
@@ -92,7 +92,7 @@
   "TRANSFER": true,
   "TRANSFER DIRECT": true,
   "UALA": true,
-  "UNAGRA": false,
+  "UNAGRA": true,
   "VALMEX": false,
   "VALUE": true,
   "VE POR MAS": true,
