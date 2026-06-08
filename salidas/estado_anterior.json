@@ -1,7 +1,7 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "08/06/2026 12:23:04"
+    "timestamp": "08/06/2026 14:38:31"
   },
   "ACTINVER": true,
   "AFIRME": true,
@@ -79,7 +79,7 @@
   "NVIO": true,
   "PAGATODO": true,
   "PPBALANCEMX": true,
-  "PROFUTURO": true,
+  "PROFUTURO": false,
   "Peibo": true,
   "SABADELL": true,
   "SANTANDER": true,
