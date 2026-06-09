@@ -1,11 +1,11 @@
 {
   "_meta": {
     "total": 95,
-    "timestamp": "09/06/2026 07:42:23"
+    "timestamp": "09/06/2026 10:29:04"
   },
   "ACTINVER": true,
   "AFIRME": true,
-  "ARCUS FI": true,
+  "ARCUS FI": false,
   "ASP INTEGRA OPC": true,
   "AZTECA": true,
   "BAJIO": true,
