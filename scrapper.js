@@ -42,6 +42,29 @@ const esGracia = () => {
   return (hora === 6 && min < 30) || (hora === 18 && min < 30);
 };
 
+// ─── CIERRE OPERATIVO PROGRAMADO ───────────────────────────────
+// Entidades cuya desconexión a cierta hora es NORMAL (no es falla).
+// A partir de la hora indicada, su estatus false se trata como
+// "Cierre operativo programado" y NO genera alerta de falla.
+// Confirmado por Á. García: CLS cierra su operación ~17:45.
+// Valores en hora local de México (24h, "HH:MM"); ajustable.
+const CIERRE_PROGRAMADO = {
+  'CLS': '17:40',
+};
+const minutosDelDia = (hhmm) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+};
+const ahoraEnMinutos = () => {
+  const d = dayjs().tz(ZONA);
+  return d.hour() * 60 + d.minute();
+};
+const esCierreProgramado = (nombre) =>
+  !!CIERRE_PROGRAMADO[nombre] && ahoraEnMinutos() >= minutosDelDia(CIERRE_PROGRAMADO[nombre]);
+
+// ─── URL del tablero en vivo (pie del correo) ──────────────────
+const DASHBOARD_URL = 'https://monitor-monspei.netlify.app/';
+
 // ─── CONFIG EMAIL ── lee variables de entorno (GitHub Secrets) ─
 const EMAIL_CONFIG = {
   habilitado: !!(process.env.GMAIL_USER && process.env.GMAIL_PASS),
@@ -132,19 +155,26 @@ const enviarEmail = async (asunto, html, texto) => {
     console.log('  Email: ' + AM + 'deshabilitado' + X);
     return;
   }
+  // Soporta varios destinatarios separados por coma en GMAIL_PARA
+  const destinatarios = EMAIL_CONFIG.para.split(',').map(s=>s.trim()).filter(Boolean);
   try {
     process.stdout.write('  Enviando email... ');
     const transporter = nodemailer.createTransport(EMAIL_CONFIG.smtp);
-    await transporter.sendMail({
-      from:    EMAIL_CONFIG.de,
-      to:      EMAIL_CONFIG.para,
+    const info = await transporter.sendMail({
+      from:    '"MONSPEI - Banxico" <' + EMAIL_CONFIG.de + '>',
+      to:      destinatarios,
       subject: asunto,
       text:    texto,
       html:    html,
     });
-    console.log(V + 'OK → ' + EMAIL_CONFIG.para + X);
+    console.log(V + 'OK → ' + destinatarios.join(', ') + X);
+    console.log('  >>> EMAIL_ENVIADO | accepted=' + JSON.stringify(info.accepted) +
+                ' | rejected=' + JSON.stringify(info.rejected) +
+                ' | id=' + (info.messageId||''));
   } catch(e) {
+    // Falla visible en el log del step para diagnóstico (sigue exit 0 para no romper el push)
     console.log(R + 'ERROR email: ' + e.message + X);
+    console.log('  >>> EMAIL_FALLIDO | ' + e.message);
   }
 };
 
@@ -415,7 +445,8 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
                 <td>
                   <p style="margin:0;font-size:10px;color:#9AACBF;line-height:1.7;">
                     <span style="color:#5a7a9a;font-weight:600;">MONSPEI v5 (GitHub Actions)</span> &nbsp;&middot;&nbsp; Banco de M&eacute;xico<br>
-                    Monitoreo autom&aacute;tico &middot; Diccionario de Eventos Operativos
+                    Monitoreo autom&aacute;tico &middot; Diccionario de Eventos Operativos<br>
+                    <a href="${DASHBOARD_URL}" style="color:#2E75B6;font-weight:600;text-decoration:none;">Ver tablero en vivo &rarr;</a>
                   </p>
                 </td>
                 <td align="right" style="vertical-align:middle;">
@@ -435,6 +466,7 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   const texto = [
     'MONSPEI — Monitor SPEI Banxico (GitHub Actions)',
     timestamp,
+    'Tablero en vivo: ' + DASHBOARD_URL,
     '',
     'Conectados   : ' + conn.length,
     'Desconectados: ' + disc.length,
@@ -538,6 +570,17 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
   const { seCayeron, seReconectaron, entidadesNuevas, entidadesRemovidas, hayCambios }
     = detectarCambios(bancos, estadoAnterior);
 
+  // Cierres operativos programados (p.ej. CLS ~17:45) → NO son falla operativa
+  const cierresProgramados = seCayeron.filter(b => esCierreProgramado(b.nombre));
+  const seCayeronReal       = seCayeron.filter(b => !esCierreProgramado(b.nombre));
+  if (cierresProgramados.length > 0) {
+    console.log('');
+    console.log('  '+AM+B+'  CIERRE OPERATIVO PROGRAMADO (no es falla) ('+cierresProgramados.length+'):'+X);
+    cierresProgramados.forEach(b => console.log('  '+AM+'  ~ '+b.nombre+' (desconexión esperada por horario)'+X));
+  }
+  const hayEstructural = entidadesNuevas.length > 0 || entidadesRemovidas.length > 0;
+  const hayFallaReal   = seCayeronReal.length > 0;
+
   // ── 5. Tabla terminal ───────────────────────────────────────
   console.log('');
   console.log('  '+'-'.repeat(80));
@@ -619,12 +662,16 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
     console.log('  Email: '+V+'omitido (sin cambios)'+X);
   } else if (esGracia()) {
     console.log('  Email: '+AM+'omitido (período de gracia — transición operativa normal)'+X);
-  } else if (esNocturno && seCayeron.length > 0 && entidadesNuevas.length === 0 && entidadesRemovidas.length === 0 && seReconectaron.length === 0) {
-    // Si es de noche y SOLO hay caídas, omitimos el email porque es inactividad programada normal
+  } else if (esNocturno && hayFallaReal && !hayEstructural && seReconectaron.length === 0) {
+    // De noche, las caídas reales son inactividad programada normal → sin correo
     console.log('  Email: '+AM+'omitido (horario nocturno — inactividad programada)'+X);
+  } else if (!hayFallaReal && !hayEstructural) {
+    // Solo reconexiones y/o cierres operativos programados (p.ej. CLS ~17:45):
+    // CAMBIO DCIB: no se notifica restablecimiento; CAMBIO Á.García: evita falso positivo.
+    console.log('  Email: '+AM+'omitido (sin eventos que ameriten alerta — reconexión / cierre programado)'+X);
   } else {
     const { asunto, html, texto } = construirEmail(
-      conn, disc, seCayeron, seReconectaron,
+      conn, disc, seCayeronReal, seReconectaron,
       entidadesNuevas, entidadesRemovidas,
       bancos.length, timestamp, esNocturno
     );
@@ -677,7 +724,8 @@ const construirEmail = (conn, disc, seCayeron, seReconectaron,
     const tagFalla = esNocturno ? "REPOSO_NOCTURNO" : "FALLA_OPERATIVA";
     
     const filas = [
-      ...seCayeron.map(b=>'"'+b.nombre+'","'+tagFalla+'","'+timestamp+'"'),
+      ...seCayeronReal.map(b=>'"'+b.nombre+'","'+tagFalla+'","'+timestamp+'"'),
+      ...cierresProgramados.map(b=>'"'+b.nombre+'","CIERRE_PROGRAMADO","'+timestamp+'"'),
       ...seReconectaron.map(b=>'"'+b.nombre+'","NORMALIZACION","'+timestamp+'"'),
       ...entidadesNuevas.map(b=>'"'+b.nombre+'","CAMBIO_ESTRUCTURAL","'+timestamp+'"'),
       ...entidadesRemovidas.map(b=>'"'+b.nombre+'","RIESGO_BAJA","'+timestamp+'"'),
